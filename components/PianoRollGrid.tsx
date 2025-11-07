@@ -327,11 +327,11 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
         <div className="relative" onClick={handleCanvasClick}>
           <canvas
             ref={canvasRef}
-            className="block"
+            className="block pointer-events-none"
           />
           
           {/* Interactive Piano Keys */}
-          <div className="absolute top-0 left-0 pointer-events-auto" style={{ width: `${PIANO_KEY_WIDTH * zoom}px` }}>
+          <div className="absolute top-0 left-0 z-20 pointer-events-auto" style={{ width: `${PIANO_KEY_WIDTH * zoom}px` }}>
             {Array.from({ length: TOTAL_KEYS }).map((_, i) => {
               const noteIndex = (TOTAL_KEYS - i - 1) % NOTES_PER_OCTAVE;
               const octave = Math.floor((TOTAL_KEYS - i - 1) / NOTES_PER_OCTAVE) + 1;
@@ -355,19 +355,21 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
           </div>
           
           {/* Render notes on top of canvas */}
-          {session.notes.map((note) => (
-            <Note
-              key={note.id}
-              note={note}
-              isSelected={selectedNotes.includes(note.id)}
-              beatWidth={BEAT_WIDTH * zoom}
-              keyHeight={KEY_HEIGHT * zoom}
-              pianoKeyWidth={PIANO_KEY_WIDTH * zoom}
-              totalKeys={TOTAL_KEYS}
-              viewRangeStart={viewRange.start}
-              onClick={handleNoteClick}
-            />
-          ))}
+          <div className="absolute top-0 left-0 z-10 pointer-events-none" style={{ width: '100%', height: '100%' }}>
+            {session.notes.map((note) => (
+              <Note
+                key={note.id}
+                note={note}
+                isSelected={selectedNotes.includes(note.id)}
+                beatWidth={BEAT_WIDTH * zoom}
+                keyHeight={KEY_HEIGHT * zoom}
+                pianoKeyWidth={PIANO_KEY_WIDTH * zoom}
+                totalKeys={TOTAL_KEYS}
+                viewRangeStart={viewRange.start}
+                onClick={handleNoteClick}
+              />
+            ))}
+          </div>
         </div>
       </div>
       

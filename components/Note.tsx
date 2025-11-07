@@ -46,7 +46,7 @@ export default function Note({
   
   return (
     <div
-      className={`absolute cursor-pointer transition-all duration-150 rounded-sm ${
+      className={`absolute cursor-pointer transition-all duration-150 rounded-sm pointer-events-auto ${
         isSelected
           ? 'bg-cyan-400 border-2 border-cyan-300 shadow-lg shadow-cyan-400/50 z-10'
           : 'bg-blue-500 border border-blue-400 hover:bg-blue-400 hover:border-blue-300'
