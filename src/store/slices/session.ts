@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand';
 import { SessionContext, Note, Message, LyricsSegment } from '@/src/types';
+import { clearLocalStorage } from '../middleware/persistence';
 
 export interface SessionSlice {
   session: SessionContext;
@@ -13,6 +14,7 @@ export interface SessionSlice {
   setKeySignature: (key: string) => void;
   addMessage: (message: Message) => void;
   updateLyrics: (lyrics: string, segments?: LyricsSegment[]) => void;
+  clearSession: () => void;
 }
 
 const createInitialSession = (): SessionContext => ({
@@ -122,4 +124,11 @@ export const createSessionSlice: StateCreator<SessionSlice> = (set) => ({
         updatedAt: Date.now(),
       },
     })),
+  
+  clearSession: () => {
+    clearLocalStorage();
+    set(() => ({
+      session: createInitialSession(),
+    }));
+  },
 });
