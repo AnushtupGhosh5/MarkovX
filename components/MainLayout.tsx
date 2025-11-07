@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PianoRollGrid from './PianoRollGrid';
 import ShaderBackground from './shader-background';
+import { useAudioEngine } from '@/src/hooks/useAudioEngine';
+import { useStore } from '@/src/store';
 
 type PanelView = 'pianoRoll' | 'lyrics' | 'mixer';
 
@@ -13,6 +15,31 @@ interface MainLayoutProps {
 export default function MainLayout({ children }: MainLayoutProps) {
   const [activePanel, setActivePanel] = useState<PanelView | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  
+  const { audioEngine, initializeAudio } = useAudioEngine();
+  const { session } = useStore((state) => ({
+    session: state.session
+  }));
+
+  const handlePlay = async () => {
+    await initializeAudio();
+    
+    if (isPlaying) {
+      audioEngine.pause();
+      setIsPlaying(false);
+    } else {
+      // Schedule all notes
+      audioEngine.scheduleNotes(session.notes, session.tempo);
+      audioEngine.play();
+      setIsPlaying(true);
+    }
+  };
+
+  const handleStop = () => {
+    audioEngine.stop();
+    setIsPlaying(false);
+  };
 
   return (
     <div className="flex h-screen flex-col text-white relative">
@@ -179,17 +206,24 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <div className="relative z-10 border-t border-white/5 bg-black/20 backdrop-blur-sm px-8 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <button className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black hover:bg-gray-100 transition-colors duration-200">
+                <button 
+                  onClick={handlePlay}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black hover:bg-gray-100 transition-colors duration-200"
+                  title={isPlaying ? 'Pause' : 'Play'}
+                >
                   <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
+                    {isPlaying ? (
+                      <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                    ) : (
+                      <path d="M8 5v14l11-7z" />
+                    )}
                   </svg>
                 </button>
-                <button className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 hover:bg-white/15 text-white border border-white/10 transition-colors duration-200">
-                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                  </svg>
-                </button>
-                <button className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 hover:bg-white/15 text-white border border-white/10 transition-colors duration-200">
+                <button 
+                  onClick={handleStop}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 hover:bg-white/15 text-white border border-white/10 transition-colors duration-200"
+                  title="Stop"
+                >
                   <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                     <rect x="4" y="4" width="16" height="16" />
                   </svg>
@@ -197,12 +231,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
               </div>
 
               <div className="flex items-center gap-6">
-                <span className="text-sm text-gray-400 font-mono">00:00 / 00:00</span>
+                <span className="text-sm text-gray-400 font-mono">
+                  {isPlaying ? '▶' : '⏸'} {session.notes.length} notes
+                </span>
                 <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-lg px-4 py-2">
                   <span className="text-sm text-gray-400">Tempo:</span>
                   <input
                     type="number"
-                    defaultValue={120}
+                    value={session.tempo}
+                    onChange={(e) => {
+                      const tempo = parseInt(e.target.value);
+                      if (tempo >= 40 && tempo <= 240) {
+                        useStore.setState((state) => ({
+                          session: { ...state.session, tempo }
+                        }));
+                      }
+                    }}
                     min={40}
                     max={240}
                     className="w-16 rounded bg-white/5 border border-white/10 px-2 py-1 text-sm text-white font-mono focus:outline-none focus:border-white/20 transition-colors"

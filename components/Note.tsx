@@ -1,6 +1,7 @@
 'use client';
 
 import { Note as NoteType } from '@/src/types';
+import { useAudioEngine } from '@/src/hooks/useAudioEngine';
 
 interface NoteProps {
   note: NoteType;
@@ -23,6 +24,8 @@ export default function Note({
   viewRangeStart,
   onClick,
 }: NoteProps) {
+  const { playNote } = useAudioEngine();
+  
   // Calculate position and dimensions
   const x = pianoKeyWidth + (note.start - viewRangeStart) * beatWidth;
   const width = note.duration * beatWidth;
@@ -35,6 +38,9 @@ export default function Note({
   const velocityOpacity = note.velocity / 127;
   
   const handleClick = (e: React.MouseEvent) => {
+    console.log(`🎵 Note clicked! Pitch: ${note.pitch}, Duration: ${note.duration}, Velocity: ${note.velocity}`);
+    // Play the note sound
+    playNote(note.pitch, note.duration * 0.5, note.velocity);
     onClick(note.id, e);
   };
   

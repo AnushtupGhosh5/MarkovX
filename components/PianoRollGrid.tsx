@@ -2,7 +2,9 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { useStore } from '@/src/store';
+import { useAudioEngine } from '@/src/hooks/useAudioEngine';
 import Note from './Note';
+import PianoKey from './PianoKey';
 
 interface PianoRollGridProps {
   width?: number;
@@ -27,6 +29,8 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  
+  const { playNote } = useAudioEngine();
   
   const { viewRange, session, selectedNotes, setSelectedNotes, addSelectedNote, clearSelectedNotes, addNotes, deleteNotes } = useStore((state) => ({
     viewRange: state.viewRange,
@@ -248,6 +252,9 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
       
       addNotes([newNote]);
       
+      // Play the note sound
+      playNote(pitch, 0.5, 100);
+      
       // Select the newly created note
       setSelectedNotes([newNote.id]);
     } else {
@@ -261,6 +268,13 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
       {/* Toolbar */}
       <div className="flex items-center gap-3 px-4 py-3 bg-slate-900/60 border-b border-cyan-500/20">
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => playNote(60, 0.5, 100)}
+            className="px-3 py-1.5 text-xs rounded-lg bg-cyan-600/60 border border-cyan-500/50 hover:bg-cyan-500/60 hover:border-cyan-400/50 transition-all text-white font-semibold"
+            title="Test Audio (Middle C)"
+          >
+            🔊 Test
+          </button>
           <button
             onClick={handleZoomOut}
             className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800/60 border border-cyan-500/30 hover:bg-slate-700/60 hover:border-cyan-400/50 transition-all"
@@ -315,6 +329,31 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
             ref={canvasRef}
             className="block"
           />
+          
+          {/* Interactive Piano Keys */}
+          <div className="absolute top-0 left-0 pointer-events-auto" style={{ width: `${PIANO_KEY_WIDTH * zoom}px` }}>
+            {Array.from({ length: TOTAL_KEYS }).map((_, i) => {
+              const noteIndex = (TOTAL_KEYS - i - 1) % NOTES_PER_OCTAVE;
+              const octave = Math.floor((TOTAL_KEYS - i - 1) / NOTES_PER_OCTAVE) + 1;
+              const noteName = NOTE_NAMES[noteIndex];
+              const isBlackKey = BLACK_KEYS.includes(noteIndex);
+              const pitch = TOTAL_KEYS - i - 1;
+              
+              return (
+                <PianoKey
+                  key={i}
+                  pitch={pitch}
+                  noteName={noteName}
+                  octave={octave}
+                  isBlackKey={isBlackKey}
+                  top={i * KEY_HEIGHT * zoom}
+                  height={KEY_HEIGHT * zoom}
+                  width={PIANO_KEY_WIDTH * zoom}
+                />
+              );
+            })}
+          </div>
+          
           {/* Render notes on top of canvas */}
           {session.notes.map((note) => (
             <Note
