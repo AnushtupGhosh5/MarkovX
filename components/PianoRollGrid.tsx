@@ -1,10 +1,13 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { useStore } from '@/src/store';
 import { useAudioEngine } from '@/src/hooks/useAudioEngine';
 import Note from './Note';
 import PianoKey from './PianoKey';
+import Playhead from './Playhead';
+import LoopRegion from './LoopRegion';
+import PlaybackControls from './PlaybackControls';
 
 interface PianoRollGridProps {
   width?: number;
@@ -30,9 +33,28 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   
-  const { playNote } = useAudioEngine();
+  const { playNote, audioEngine, initializeAudio } = useAudioEngine();
   
-  const { viewRange, session, selectedNotes, setSelectedNotes, addSelectedNote, clearSelectedNotes, addNotes, deleteNotes, updateNotes } = useStore((state) => ({
+  const {
+    viewRange,
+    session,
+    selectedNotes,
+    setSelectedNotes,
+    addSelectedNote,
+    clearSelectedNotes,
+    addNotes,
+    deleteNotes,
+    updateNotes,
+    isPlaying,
+    playbackPosition,
+    loopStart,
+    loopEnd,
+    playbackMode,
+    setIsPlaying,
+    setPlaybackPosition,
+    setLoopRange,
+    setPlaybackMode,
+  } = useStore((state) => ({
     viewRange: state.viewRange,
     session: state.session,
     selectedNotes: state.selectedNotes,
@@ -42,6 +64,15 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
     addNotes: state.addNotes,
     deleteNotes: state.deleteNotes,
     updateNotes: state.updateNotes,
+    isPlaying: state.isPlaying,
+    playbackPosition: state.playbackPosition,
+    loopStart: state.loopStart,
+    loopEnd: state.loopEnd,
+    playbackMode: state.playbackMode,
+    setIsPlaying: state.setIsPlaying,
+    setPlaybackPosition: state.setPlaybackPosition,
+    setLoopRange: state.setLoopRange,
+    setPlaybackMode: state.setPlaybackMode,
   }));
   
   const timeSignature = session.timeSignature;
@@ -234,6 +265,103 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
     }
   };
   
+  // Playback control handlers
+  const handlePlay = useCallback(async () => {
+    await initializeAudio();
+    
+    // Set tempo from session
+    audioEngine.setTempo(session.tempo);
+    
+    // Schedule notes
+    const isLoopMode = playbackMode === 'loop';
+    audioEngine.scheduleNotes(session.notes, loopStart, loopEnd, isLoopMode);
+    
+    // Start playback
+    audioEngine.play();
+    setIsPlaying(true);
+  }, [initializeAudio, audioEngine, session.tempo, session.notes, loopStart, loopEnd, playbackMode, setIsPlaying]);
+  
+  const handlePause = useCallback(() => {
+    audioEngine.pause();
+    setIsPlaying(false);
+  }, [audioEngine, setIsPlaying]);
+  
+  const handleStop = useCallback(() => {
+    audioEngine.stop();
+    setIsPlaying(false);
+    setPlaybackPosition(playbackMode === 'loop' ? loopStart : 0);
+  }, [audioEngine, setIsPlaying, setPlaybackPosition, playbackMode, loopStart]);
+  
+  const handleSeek = useCallback((position: number) => {
+    audioEngine.seek(position);
+    setPlaybackPosition(position);
+  }, [audioEngine, setPlaybackPosition]);
+  
+  const handleLoopChange = useCallback((start: number, end: number) => {
+    setLoopRange(start, end);
+    
+    // If playing, reschedule notes with new loop range
+    if (isPlaying) {
+      audioEngine.scheduleNotes(session.notes, start, end, playbackMode === 'loop');
+    }
+  }, [setLoopRange, isPlaying, audioEngine, session.notes, playbackMode]);
+  
+  const handleModeChange = useCallback((mode: 'loop' | 'full') => {
+    setPlaybackMode(mode);
+    
+    // If playing, reschedule notes with new mode
+    if (isPlaying) {
+      audioEngine.scheduleNotes(session.notes, loopStart, loopEnd, mode === 'loop');
+    }
+  }, [setPlaybackMode, isPlaying, audioEngine, session.notes, loopStart, loopEnd]);
+  
+  // Animation loop to update playback position
+  useEffect(() => {
+    if (!isPlaying) return;
+    
+    let animationFrameId: number;
+    
+    const updatePosition = () => {
+      const currentPos = audioEngine.getCurrentPosition();
+      setPlaybackPosition(currentPos);
+      animationFrameId = requestAnimationFrame(updatePosition);
+    };
+    
+    animationFrameId = requestAnimationFrame(updatePosition);
+    
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [isPlaying, audioEngine, setPlaybackPosition]);
+  
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // Space bar for play/pause (only if not typing in an input)
+      if (event.code === 'Space' && !event.repeat) {
+        const target = event.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          event.preventDefault();
+          if (isPlaying) {
+            handlePause();
+          } else {
+            handlePlay();
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [isPlaying, handlePlay, handlePause]);
+  
+  // Reschedule notes when they change
+  useEffect(() => {
+    if (isPlaying) {
+      audioEngine.scheduleNotes(session.notes, loopStart, loopEnd, playbackMode === 'loop');
+    }
+  }, [session.notes]);
+  
   const handleCanvasClick = (event: React.MouseEvent<HTMLDivElement>) => {
     // Only handle clicks on the canvas container, not on notes
     if (event.target !== event.currentTarget) {
@@ -283,6 +411,18 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
     <div className="relative w-full h-full flex flex-col">
       {/* Toolbar */}
       <div className="flex items-center gap-3 px-4 py-3 bg-slate-900/60 border-b border-cyan-500/20">
+        {/* Playback Controls */}
+        <PlaybackControls
+          isPlaying={isPlaying}
+          playbackMode={playbackMode}
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onStop={handleStop}
+          onModeChange={handleModeChange}
+        />
+        
+        <div className="h-6 w-px bg-cyan-500/30" />
+        
         <div className="flex items-center gap-2">
           <button
             onClick={() => playNote(60, 0.5, 100)}
@@ -370,6 +510,17 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
             })}
           </div>
           
+          {/* Loop Region */}
+          <LoopRegion
+            loopStart={loopStart}
+            loopEnd={loopEnd}
+            beatWidth={BEAT_WIDTH * zoom}
+            pianoKeyWidth={PIANO_KEY_WIDTH * zoom}
+            viewRangeStart={viewRange.start}
+            height={TOTAL_KEYS * KEY_HEIGHT * zoom}
+            onLoopChange={handleLoopChange}
+          />
+          
           {/* Render notes on top of canvas */}
           <div className="absolute top-0 left-0 z-10 pointer-events-none" style={{ width: '100%', height: '100%' }}>
             {session.notes.map((note) => (
@@ -388,13 +539,25 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
               />
             ))}
           </div>
+          
+          {/* Playhead */}
+          <Playhead
+            position={playbackPosition}
+            beatWidth={BEAT_WIDTH * zoom}
+            pianoKeyWidth={PIANO_KEY_WIDTH * zoom}
+            viewRangeStart={viewRange.start}
+            height={TOTAL_KEYS * KEY_HEIGHT * zoom}
+            isPlaying={isPlaying}
+            onSeek={handleSeek}
+          />
         </div>
       </div>
       
       {/* Instructions */}
       <div className="absolute bottom-4 right-4 glass-panel rounded-lg px-3 py-2 text-xs text-cyan-300/60 space-y-1">
-        <div>Click: Add Note • Right-Click: Delete Note • Drag Edge: Resize</div>
-        <div>Scroll: Pan • Ctrl+Scroll: Zoom • Delete/Backspace: Remove Selected</div>
+        <div>Click: Add Note • Right-Click: Delete • Drag Edge: Resize</div>
+        <div>Space: Play/Pause • Drag Playhead: Seek • Drag Loop: Adjust Range</div>
+        <div>Scroll: Pan • Ctrl+Scroll: Zoom</div>
       </div>
     </div>
   );

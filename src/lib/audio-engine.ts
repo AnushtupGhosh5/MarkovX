@@ -1,17 +1,18 @@
+import * as Tone from 'tone';
 import { Note } from '@/src/types';
-import { midiToFrequency, beatsToSeconds } from './audio-utils';
 
 export class AudioEngine {
-  private audioContext: AudioContext | null = null;
   private isInitialized: boolean = false;
-  private masterGain: GainNode | null = null;
+  private synth: Tone.PolySynth | null = null;
+  private scheduledPart: Tone.Part | null = null;
+  private triggeredNotes: Set<string> = new Set();
 
   constructor() {
-    // Audio context will be created during initialization
+    // Tone.js will be initialized on first interaction
   }
 
   /**
-   * Initialize audio context (must be called after user interaction)
+   * Initialize Tone.js (must be called after user interaction)
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
@@ -20,22 +21,30 @@ export class AudioEngine {
     }
     
     try {
-      // Create audio context
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      // Start Tone.js audio context
+      await Tone.start();
+      console.log('✅ Tone.js started');
       
-      // Create master gain node
-      this.masterGain = this.audioContext.createGain();
-      this.masterGain.gain.value = 0.3; // Master volume
-      this.masterGain.connect(this.audioContext.destination);
+      // Create polyphonic synthesizer
+      this.synth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: {
+          attack: 0.01,
+          decay: 0.1,
+          sustain: 0.3,
+          release: 0.5,
+        },
+      }).toDestination();
       
-      // Resume context if suspended (browser autoplay policy)
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
+      // Set master volume
+      this.synth.volume.value = -10; // dB
+      
+      // Set default tempo
+      Tone.Transport.bpm.value = 120;
       
       this.isInitialized = true;
       console.log('✅ Audio engine initialized successfully!');
-      console.log('🎵 AudioContext state:', this.audioContext.state);
+      console.log('🎵 Tone.js context state:', Tone.context.state);
     } catch (error) {
       console.error('❌ Failed to initialize audio:', error);
       throw error;
@@ -46,41 +55,20 @@ export class AudioEngine {
    * Play a single note immediately
    */
   playNote(midiNote: number, duration: number = 0.5, velocity: number = 100): void {
-    if (!this.isInitialized || !this.audioContext || !this.masterGain) {
+    if (!this.isInitialized || !this.synth) {
       console.warn('⚠️ Audio engine not initialized, initializing now...');
       this.initialize().then(() => this.playNote(midiNote, duration, velocity));
       return;
     }
 
     try {
-      const frequency = midiToFrequency(midiNote);
-      const now = this.audioContext.currentTime;
-      
-      console.log(`🎹 Playing MIDI ${midiNote} at ${frequency.toFixed(2)}Hz for ${duration}s`);
-      
-      // Create oscillator
-      const oscillator = this.audioContext.createOscillator();
-      oscillator.type = 'triangle'; // Smooth sound
-      oscillator.frequency.value = frequency;
-      
-      // Create gain node for this note
-      const gainNode = this.audioContext.createGain();
+      const note = Tone.Frequency(midiNote, 'midi').toNote();
       const velocityNormalized = velocity / 127;
       
-      // ADSR envelope
-      gainNode.gain.setValueAtTime(0, now);
-      gainNode.gain.linearRampToValueAtTime(velocityNormalized * 0.3, now + 0.01); // Attack
-      gainNode.gain.linearRampToValueAtTime(velocityNormalized * 0.2, now + 0.1); // Decay
-      gainNode.gain.setValueAtTime(velocityNormalized * 0.2, now + duration - 0.1); // Sustain
-      gainNode.gain.linearRampToValueAtTime(0, now + duration); // Release
+      console.log(`🎹 Playing MIDI ${midiNote} (${note}) for ${duration}s`);
       
-      // Connect nodes
-      oscillator.connect(gainNode);
-      gainNode.connect(this.masterGain);
-      
-      // Start and stop
-      oscillator.start(now);
-      oscillator.stop(now + duration);
+      // Trigger note with velocity
+      this.synth.triggerAttackRelease(note, duration, undefined, velocityNormalized);
       
       console.log('✅ Note playing!');
     } catch (error) {
@@ -89,95 +77,141 @@ export class AudioEngine {
   }
 
   /**
-   * Schedule notes for playback
+   * Schedule notes for playback using Tone.Part
    */
-  scheduleNotes(notes: Note[], bpm: number): void {
-    if (!this.isInitialized || !this.audioContext || !this.masterGain) {
+  scheduleNotes(notes: Note[], loopStart: number, loopEnd: number, isLoopMode: boolean): void {
+    if (!this.isInitialized || !this.synth) {
       console.warn('Audio engine not initialized');
       return;
     }
 
-    const now = this.audioContext.currentTime;
+    // Clear existing scheduled part
+    if (this.scheduledPart) {
+      this.scheduledPart.dispose();
+      this.scheduledPart = null;
+    }
+
+    // Clear triggered notes tracking
+    this.triggeredNotes.clear();
     
-    console.log(`🎵 Scheduling ${notes.length} notes at ${bpm} BPM`);
+    console.log(`🎵 Scheduling ${notes.length} notes`);
 
-    // Schedule each note
-    notes.forEach(note => {
-      const frequency = midiToFrequency(note.pitch);
-      const startTime = now + beatsToSeconds(note.start, bpm);
-      const duration = beatsToSeconds(note.duration, bpm);
-      const velocityNormalized = note.velocity / 127;
+    // Create events array for Tone.Part
+    const events = notes.map(note => ({
+      time: `${note.start}:0:0`, // Convert beats to Tone.js time notation
+      note: Tone.Frequency(note.pitch, 'midi').toNote(),
+      duration: `${note.duration}:0:0`,
+      velocity: note.velocity / 127,
+      id: note.id,
+    }));
 
-      // Create oscillator for this note
-      const oscillator = this.audioContext!.createOscillator();
-      oscillator.type = 'triangle';
-      oscillator.frequency.value = frequency;
+    // Create a new Part to schedule all notes
+    this.scheduledPart = new Tone.Part((time, event) => {
+      // Trigger the note
+      this.synth!.triggerAttackRelease(event.note, event.duration, time, event.velocity);
+      console.log(`🎵 Triggered note: ${event.note} at ${time}`);
+    }, events);
+
+    // Configure loop if in loop mode
+    if (isLoopMode) {
+      this.scheduledPart.loop = true;
+      this.scheduledPart.loopStart = `${loopStart}:0:0`;
+      this.scheduledPart.loopEnd = `${loopEnd}:0:0`;
       
-      // Create gain node
-      const gainNode = this.audioContext!.createGain();
-      gainNode.gain.setValueAtTime(0, startTime);
-      gainNode.gain.linearRampToValueAtTime(velocityNormalized * 0.3, startTime + 0.01);
-      gainNode.gain.linearRampToValueAtTime(velocityNormalized * 0.2, startTime + 0.1);
-      gainNode.gain.setValueAtTime(velocityNormalized * 0.2, startTime + duration - 0.1);
-      gainNode.gain.linearRampToValueAtTime(0, startTime + duration);
-      
-      // Connect and play
-      oscillator.connect(gainNode);
-      gainNode.connect(this.masterGain!);
-      oscillator.start(startTime);
-      oscillator.stop(startTime + duration);
-    });
+      Tone.Transport.loop = true;
+      Tone.Transport.loopStart = `${loopStart}:0:0`;
+      Tone.Transport.loopEnd = `${loopEnd}:0:0`;
+    } else {
+      this.scheduledPart.loop = false;
+      Tone.Transport.loop = false;
+    }
+
+    // Start the part
+    this.scheduledPart.start(0);
+    
+    console.log('✅ Notes scheduled');
   }
 
   /**
-   * Start playback (notes are already scheduled)
+   * Start playback
    */
   play(): void {
-    console.log('▶️ Play called');
+    if (!this.isInitialized) {
+      console.warn('Audio engine not initialized');
+      return;
+    }
+    console.log('▶️ Starting playback');
+    Tone.Transport.start();
   }
 
   /**
    * Pause playback
    */
   pause(): void {
-    console.log('⏸️ Pause called');
+    console.log('⏸️ Pausing playback');
+    Tone.Transport.pause();
   }
 
   /**
-   * Stop playback
+   * Stop playback and reset position
    */
   stop(): void {
-    console.log('⏹️ Stop called');
+    console.log('⏹️ Stopping playback');
+    Tone.Transport.stop();
+    this.triggeredNotes.clear();
   }
 
   /**
    * Seek to a specific position in beats
    */
   seek(beats: number): void {
-    console.log(`⏩ Seek to ${beats} beats`);
+    console.log(`⏩ Seeking to ${beats} beats`);
+    Tone.Transport.position = `${beats}:0:0`;
+    this.triggeredNotes.clear();
+  }
+
+  /**
+   * Set tempo in BPM
+   */
+  setTempo(bpm: number): void {
+    console.log(`🎵 Setting tempo to ${bpm} BPM`);
+    Tone.Transport.bpm.value = bpm;
   }
 
   /**
    * Get current playback position in beats
    */
   getCurrentPosition(): number {
-    return 0;
+    const position = Tone.Transport.position;
+    // Parse position string (format: "bars:beats:sixteenths")
+    const parts = position.toString().split(':');
+    const bars = parseInt(parts[0]) || 0;
+    const beats = parseFloat(parts[1]) || 0;
+    const sixteenths = parseFloat(parts[2]) || 0;
+    
+    // Convert to total beats (assuming 4/4 time)
+    return bars * 4 + beats + sixteenths / 4;
   }
 
   /**
    * Check if currently playing
    */
   isPlaying(): boolean {
-    return false;
+    return Tone.Transport.state === 'started';
   }
 
   /**
    * Clean up resources
    */
   dispose(): void {
-    if (this.audioContext) {
-      this.audioContext.close();
+    if (this.scheduledPart) {
+      this.scheduledPart.dispose();
     }
+    if (this.synth) {
+      this.synth.dispose();
+    }
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
   }
 }
 

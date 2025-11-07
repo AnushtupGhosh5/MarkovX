@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 
 export type ActivePanel = 'pianoRoll' | 'lyrics' | 'mixer';
+export type PlaybackMode = 'loop' | 'full';
 
 export interface ViewRange {
   start: number;  // Start time in beats
@@ -12,6 +13,13 @@ export interface UISlice {
   selectedNotes: string[];
   viewRange: ViewRange;
   activePanel: ActivePanel;
+  
+  // Playback state
+  isPlaying: boolean;
+  playbackPosition: number;  // Current position in beats
+  loopStart: number;         // Loop start in beats
+  loopEnd: number;           // Loop end in beats
+  playbackMode: PlaybackMode;
   
   // Loading states
   isGenerating: boolean;
@@ -28,6 +36,14 @@ export interface UISlice {
   setIsGenerating: (isGenerating: boolean) => void;
   setIsRecording: (isRecording: boolean) => void;
   setIsExporting: (isExporting: boolean) => void;
+  
+  // Playback actions
+  setIsPlaying: (isPlaying: boolean) => void;
+  setPlaybackPosition: (position: number) => void;
+  setLoopStart: (start: number) => void;
+  setLoopEnd: (end: number) => void;
+  setLoopRange: (start: number, end: number) => void;
+  setPlaybackMode: (mode: PlaybackMode) => void;
 }
 
 export const createUISlice: StateCreator<UISlice> = (set) => ({
@@ -37,6 +53,11 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
     end: 16, // Default to 4 bars at 4/4 time
   },
   activePanel: 'pianoRoll',
+  isPlaying: false,
+  playbackPosition: 0,
+  loopStart: 0,
+  loopEnd: 4, // Default 4 beats (2 seconds at 120 BPM)
+  playbackMode: 'loop',
   isGenerating: false,
   isRecording: false,
   isExporting: false,
@@ -86,5 +107,36 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
   setIsExporting: (isExporting) =>
     set(() => ({
       isExporting,
+    })),
+  
+  setIsPlaying: (isPlaying) =>
+    set(() => ({
+      isPlaying,
+    })),
+  
+  setPlaybackPosition: (position) =>
+    set(() => ({
+      playbackPosition: position,
+    })),
+  
+  setLoopStart: (start) =>
+    set(() => ({
+      loopStart: start,
+    })),
+  
+  setLoopEnd: (end) =>
+    set(() => ({
+      loopEnd: end,
+    })),
+  
+  setLoopRange: (start, end) =>
+    set(() => ({
+      loopStart: start,
+      loopEnd: end,
+    })),
+  
+  setPlaybackMode: (mode) =>
+    set(() => ({
+      playbackMode: mode,
     })),
 });
