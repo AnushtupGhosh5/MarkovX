@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+  
 
     // Generate music with retry logic
     const audioBlob = await retryWithBackoff(
