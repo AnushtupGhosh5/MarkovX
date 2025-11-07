@@ -1,47 +1,35 @@
 # Implementation Plan
 
 - [x] 1. Set up project foundation and infrastructure
-
-
-
   - Initialize Next.js 14 project with TypeScript, TailwindCSS, and App Router
-  - Configure environment variables for HUGGINGFACE_API_KEY and OPENAI_API_KEY
+  - Configure environment variables for HUGGINGFACE_API_KEY and GEMINI_API_KEY
   - Set up .gitignore to exclude .env.local and sensitive files
   - Install core dependencies: Tone.js, Zustand, and API client libraries
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
-- [ ] 2. Implement state management and persistence
-  - [ ] 2.1 Create Zustand store with session state slice
+- [x] 2. Implement state management and persistence
+  - [x] 2.1 Create Zustand store with session state slice
     - Define SessionContext interface with tempo, key, timeSignature, notes, generatedAudio, lyrics, and conversationHistory
     - Implement store actions: updateSession, addNotes, updateNotes, deleteNotes, setTempo, setKeySignature, addMessage, updateLyrics
     - _Requirements: 5.1, 5.2, 5.4_
   
   - [ ] 2.2 Create playback state slice
-    - Implement isPlaying, currentTime, and playback control actions
+    - Implement isPlaying, currentTime, and playback control actions (play, pause, stop, seek, setCurrentTime)
+    - Add these to the UI slice or create a separate playback slice
     - _Requirements: 3.2, 6.1_
   
-  - [ ] 2.3 Create UI state slice
+  - [x] 2.3 Create UI state slice
     - Implement selectedNotes, viewRange, activePanel, and loading states
     - _Requirements: 3.1, 3.2_
   
-  - [ ] 2.4 Implement local storage persistence middleware
+  - [x] 2.4 Implement local storage persistence middleware
     - Create saveToLocalStorage and loadFromLocalStorage functions
-    - Implement automatic persistence on state changes with debouncing
+    - Implement automatic persistence on state changes
     - Add session expiration logic (24 hours)
     - _Requirements: 5.3, 5.5_
 
-- [-] 3. Build core UI layout and components
-
-
-
-
+- [x] 3. Build core UI layout and components
   - [x] 3.1 Create main layout component
-
-
-
-
-
-
     - Build responsive layout with header, sidebar, main workspace, and AI chat panel
     - Implement panel switching between piano roll, lyrics, and mixer views
     - _Requirements: 3.1, 4.1_
@@ -51,64 +39,51 @@
     - Implement toast notification system for user feedback
     - _Requirements: 7.1, 7.2_
   
-  - [ ] 3.3 Create audio controls component
-    - Implement transport controls (play, pause, stop, seek)
-    - Add tempo control with input validation (40-240 BPM)
-    - Create time display showing current position and duration
+  - [ ] 3.3 Integrate audio controls with playback state
+    - Connect transport controls (play, pause, stop) to useAudioEngine hook
+    - Wire up tempo control with session state and validation (40-240 BPM)
+    - Connect time display to currentTime from playback state
     - _Requirements: 3.2, 4.2, 5.1_
 
-- [ ] 4. Implement audio engine with Tone.js
+- [x] 4. Implement audio engine with Tone.js
   - [x] 4.1 Create AudioEngine class
-
-
-
- 
-
-
-
-
     - Initialize Tone.js PolySynth and Transport
     - Implement loadAudio method for generated audio buffers
     - Create scheduleNotes method to schedule MIDI notes for playback
     - _Requirements: 1.2, 3.2, 6.1_
   
   - [x] 4.2 Implement playback controls
-
-
-
-
-
     - Create play, pause, stop, and seek methods
     - Sync Tone.Transport with Zustand playback state
     - Handle audio context initialization on user interaction
     - _Requirements: 3.2, 9.3_
   
   - [x] 4.3 Create MIDI utility functions
-
-
-
-
-
     - Implement noteToFrequency and frequencyToNote converters
     - Create beatsToSeconds and secondsToBeats time conversion functions
     - Add note validation and range checking (0-127)
     - _Requirements: 2.3, 3.3_
 
-- [ ] 5. Build MusicGen API integration
-  - [ ] 5.1 Create MusicGen API client
+- [-] 5. Build MusicGen API integration
+  - [x] 5.1 Create MusicGen API client
     - Implement API client with Hugging Face endpoint
     - Add request validation for prompt length (10-500 characters)
     - Implement timeout handling (30 seconds)
     - _Requirements: 1.1, 1.4_
   
-  - [ ] 5.2 Create /api/generate-music route
+  - [x] 5.2 Create /api/generate-music route
+
+
+
+
+
     - Implement POST endpoint accepting GenerateMusicRequest
     - Call MusicGen API with prompt, duration, temperature, and topK parameters
     - Store generated audio temporarily in public/audio directory
     - Return GenerateMusicResponse with audioUrl
     - _Requirements: 1.1, 1.2, 1.5_
   
-  - [ ] 5.3 Implement retry logic with exponential backoff
+  - [x] 5.3 Implement retry logic with exponential backoff
     - Create retryWithBackoff utility function
     - Configure 3 retry attempts with exponential delay
     - Log errors to console for debugging
@@ -121,31 +96,31 @@
     - Show error toast on API failure with retry option
     - _Requirements: 1.1, 1.3, 7.1, 7.2_
 
-- [ ] 6. Implement piano roll editor
-  - [ ] 6.1 Create piano roll grid component
+- [x] 6. Implement piano roll editor
+  - [x] 6.1 Create piano roll grid component
     - Render time grid with beat divisions based on timeSignature
-    - Display piano keys (3 octaves minimum) on vertical axis
+    - Display piano keys (7 octaves) on vertical axis
     - Implement zoom and pan controls for viewRange
     - _Requirements: 3.1, 3.5_
   
-  - [ ] 6.2 Implement note rendering
+  - [x] 6.2 Implement note rendering
     - Create Note component displaying pitch, start, and duration
     - Render notes as rectangular blocks on grid
-    - Implement note selection with click handling
+    - Implement note selection with click handling (single and multi-select)
     - _Requirements: 3.1, 3.2_
   
   - [ ] 6.3 Add note editing interactions
     - Implement drag-and-drop for note positioning with snap-to-grid
     - Add horizontal resizing for note duration (1/16th note resolution)
-    - Implement delete functionality with keyboard shortcut
     - Update Zustand store on all note changes with debouncing
     - _Requirements: 3.2, 3.3, 3.4, 3.6_
   
-  - [ ] 6.4 Add note creation
-    - Implement click-to-create notes on empty grid cells
-    - Set default velocity to 80 and duration to 1 beat
+  - [x] 6.4 Add note creation and deletion
+    - Implement click-to-create notes on empty grid cells with snap-to-grid
+    - Set default velocity to 100 and duration to 1 beat
     - Generate unique IDs for new notes
-    - _Requirements: 3.1, 3.6_
+    - Implement delete functionality with keyboard shortcut (Delete/Backspace)
+    - _Requirements: 3.1, 3.4, 3.6_
 
 - [ ] 7. Build humming-to-melody feature
   - [ ] 7.1 Create audio recorder component
@@ -172,15 +147,16 @@
 
 - [ ] 8. Implement AI co-pilot chat interface
   - [ ] 8.1 Create chat UI components
-    - Build AIChat component with message list and input field
+    - Enhance existing chat panel in MainLayout with functional message list
     - Create Message component displaying role, content, and timestamp
     - Implement ChatInput with send button and loading state
     - Add auto-scroll to latest message
+    - Connect to Zustand store for conversationHistory
     - _Requirements: 4.1, 4.5_
   
-  - [ ] 8.2 Create OpenAI API client
-    - Implement API client with OpenAI endpoint
-    - Configure GPT-4 or GPT-3.5-turbo model
+  - [ ] 8.2 Create Gemini API client
+    - Implement API client with Google Gemini endpoint
+    - Configure gemini-pro model
     - Add timeout handling (10 seconds)
     - _Requirements: 4.1_
   
@@ -209,7 +185,7 @@
 - [ ] 9. Build lyrics generation and synchronization
   - [ ] 9.1 Create /api/generate-lyrics route
     - Implement POST endpoint accepting GenerateLyricsRequest with optional prompt, style, and mood
-    - Include sessionContext (tempo, key, mood) in OpenAI prompt
+    - Include sessionContext (tempo, key, mood) in Gemini prompt
     - Generate lyrics with appropriate length based on tempo and duration
     - Optionally suggest LyricsSegment timing based on syllable count
     - Return GenerateLyricsResponse with lyrics text and suggestedSegments
@@ -219,6 +195,7 @@
     - Build editable text area for lyrics with character counter (max 2000)
     - Add "Generate Lyrics" button with optional prompt input
     - Display generated lyrics and allow manual editing
+    - Replace placeholder in MainLayout lyrics panel
     - _Requirements: 8.3, 8.4, 8.5_
   
   - [ ] 9.3 Implement lyrics timeline synchronization
@@ -243,14 +220,14 @@
   
   - [ ] 10.2 Create /api/export-audio route
     - Implement POST endpoint accepting ExportAudioRequest with notes, tempo, and audioLayers
-    - Render audio using Tone.js on server side
+    - Render audio using Tone.js on server side or client side
     - Encode rendered audio as MP3 with 192 kbps bitrate using lamejs or similar
     - Store MP3 temporarily and return download URL
     - Generate filename with session timestamp in ISO 8601 format
     - _Requirements: 6.2, 6.3, 6.4_
   
   - [ ] 10.3 Build export UI
-    - Add "Export MP3" button to audio controls
+    - Connect "Export MP3" button in header to export functionality
     - Show loading state during export (max 5 seconds)
     - Trigger browser download on completion
     - Display error toast if export fails with retry option
@@ -266,7 +243,7 @@
   
   - [ ] 11.2 Implement graceful degradation
     - Allow MIDI editing when MusicGen API is unavailable
-    - Disable AI chat temporarily on OpenAI API failure
+    - Disable AI chat temporarily on Gemini API failure
     - Provide manual note input fallback for pitch detection failures
     - Offer WAV export as alternative if MP3 encoding fails
     - _Requirements: 7.4_
@@ -281,13 +258,13 @@
   - [ ] 12.1 Improve visual design
     - Apply consistent TailwindCSS styling across all components
     - Add smooth transitions and animations for interactions
-    - Implement responsive layout for tablet and desktop
+    - Ensure responsive layout works well on tablet and desktop
     - Create loading skeletons for async operations
     - _Requirements: 3.1, 3.2_
   
   - [ ] 12.2 Add keyboard shortcuts
     - Implement space bar for play/pause
-    - Add delete key for note deletion
+    - Delete key already implemented for note deletion
     - Create undo/redo shortcuts (Ctrl+Z, Ctrl+Y)
     - _Requirements: 3.4_
   
@@ -295,7 +272,7 @@
     - Memoize expensive calculations (note rendering, time conversions)
     - Debounce piano roll updates to reduce re-renders
     - Lazy load Tone.js and heavy dependencies
-    - Implement virtual scrolling for large note counts
+    - Implement virtual scrolling for large note counts if needed
     - _Requirements: 3.2, 3.6_
 
 - [ ]* 13. Testing and quality assurance
@@ -330,9 +307,9 @@
     - Test production deployment
     - _Requirements: 10.5_
   
-  - [ ] 14.2 Create setup documentation
-    - Write README with project overview and features
-    - Document environment variable setup
+  - [ ] 14.2 Update setup documentation
+    - Update README with complete project overview and features
+    - Document environment variable setup (GEMINI_API_KEY, HUGGINGFACE_API_KEY)
     - Provide local development instructions
     - Create demo script for hackathon presentation
     - _Requirements: 10.1, 10.2_
