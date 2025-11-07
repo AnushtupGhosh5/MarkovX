@@ -32,7 +32,7 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
   
   const { playNote } = useAudioEngine();
   
-  const { viewRange, session, selectedNotes, setSelectedNotes, addSelectedNote, clearSelectedNotes, addNotes, deleteNotes } = useStore((state) => ({
+  const { viewRange, session, selectedNotes, setSelectedNotes, addSelectedNote, clearSelectedNotes, addNotes, deleteNotes, updateNotes } = useStore((state) => ({
     viewRange: state.viewRange,
     session: state.session,
     selectedNotes: state.selectedNotes,
@@ -41,6 +41,7 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
     clearSelectedNotes: state.clearSelectedNotes,
     addNotes: state.addNotes,
     deleteNotes: state.deleteNotes,
+    updateNotes: state.updateNotes,
   }));
   
   const timeSignature = session.timeSignature;
@@ -218,6 +219,21 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
     }
   };
   
+  const handleNoteDelete = (noteId: string) => {
+    deleteNotes([noteId]);
+    // Remove from selection if it was selected
+    if (selectedNotes.includes(noteId)) {
+      setSelectedNotes(selectedNotes.filter(id => id !== noteId));
+    }
+  };
+  
+  const handleNoteResize = (noteId: string, newDuration: number) => {
+    const note = session.notes.find(n => n.id === noteId);
+    if (note) {
+      updateNotes([{ ...note, duration: newDuration }]);
+    }
+  };
+  
   const handleCanvasClick = (event: React.MouseEvent<HTMLDivElement>) => {
     // Only handle clicks on the canvas container, not on notes
     if (event.target !== event.currentTarget) {
@@ -367,6 +383,8 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
                 totalKeys={TOTAL_KEYS}
                 viewRangeStart={viewRange.start}
                 onClick={handleNoteClick}
+                onDelete={handleNoteDelete}
+                onResize={handleNoteResize}
               />
             ))}
           </div>
@@ -375,8 +393,8 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
       
       {/* Instructions */}
       <div className="absolute bottom-4 right-4 glass-panel rounded-lg px-3 py-2 text-xs text-cyan-300/60 space-y-1">
-        <div>Click: Add Note • Scroll: Pan • Ctrl+Scroll: Zoom</div>
-        <div>Delete/Backspace: Remove Selected Notes</div>
+        <div>Click: Add Note • Right-Click: Delete Note • Drag Edge: Resize</div>
+        <div>Scroll: Pan • Ctrl+Scroll: Zoom • Delete/Backspace: Remove Selected</div>
       </div>
     </div>
   );
