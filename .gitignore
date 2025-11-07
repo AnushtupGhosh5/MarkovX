@@ -32,3 +32,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.kiro/specs/musepilot/specs/design.md
+.kiro/specs/musepilot/specs/tasks.md
+.kiro

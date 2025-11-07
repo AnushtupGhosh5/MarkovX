@@ -1,19 +1,12 @@
 import { create } from 'zustand';
-import { createSessionSlice, SessionSlice } from './slices/session';
-import { createPlaybackSlice, PlaybackSlice } from './slices/playback';
-import { createUISlice, UISlice } from './slices/ui';
-import { persist, saveToLocalStorage, loadFromLocalStorage, clearLocalStorage } from './middleware/persistence';
+import { SessionSlice, createSessionSlice } from './slices/session';
+import { UISlice, createUISlice } from './slices/ui';
 
-type StoreState = SessionSlice & PlaybackSlice & UISlice;
+type StoreState = SessionSlice & UISlice;
 
-export const useStore = create<StoreState>()(
-  persist((...a) => ({
-    ...createSessionSlice(...a),
-    ...createPlaybackSlice(...a),
-    ...createUISlice(...a),
-  }))
-);
+export const useStore = create<StoreState>()((...a) => ({
+  ...createSessionSlice(...a),
+  ...createUISlice(...a),
+}));
 
-// Export persistence utilities for manual control if needed
-export { saveToLocalStorage, loadFromLocalStorage, clearLocalStorage };
 export type { StoreState };
