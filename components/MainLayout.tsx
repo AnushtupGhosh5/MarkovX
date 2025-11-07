@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import PianoRollGrid from './PianoRollGrid';
 
 type PanelView = 'pianoRoll' | 'lyrics' | 'mixer';
 
@@ -99,11 +100,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
           {/* Panel Content Area */}
           <div className="flex-1 overflow-auto p-8">
             {activePanel === 'pianoRoll' && (
-              <div className="flex h-full items-center justify-center">
-                <div className="glass-panel rounded-3xl p-12 text-center shadow-2xl">
-                  <h2 className="text-3xl font-bold text-cyan-300">Piano Roll</h2>
-                  <p className="mt-3 text-cyan-200/60">Piano roll editor will appear here</p>
-                </div>
+              <div className="h-full">
+                <PianoRollGrid />
               </div>
             )}
 
