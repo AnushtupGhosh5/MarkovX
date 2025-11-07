@@ -59,3 +59,18 @@ export interface SessionContext {
   projectName?: string;
   tags?: string[];
 }
+
+// API Request/Response Types
+
+export interface GenerateMusicRequest {
+  prompt: string;
+  duration?: number;        // In seconds, default 10
+  temperature?: number;     // 0-1, default 0.8
+  topK?: number;           // Default 250
+}
+
+export interface GenerateMusicResponse {
+  success: boolean;
+  audioUrl?: string;        // Temporary URL to generated audio
+  error?: string;
+}
