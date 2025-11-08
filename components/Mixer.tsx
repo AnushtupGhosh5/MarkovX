@@ -241,7 +241,7 @@ export default function Mixer() {
         track.id === trackId ? { ...track, solo: !track.solo } : track
       );
 
-      // Handle solo logic
+      // Handle solo logic: mute all non-solo tracks if any track is soloed
       const hasSolo = newTracks.some(t => t.solo);
       
       newTracks.forEach(track => {
@@ -272,12 +272,14 @@ export default function Mixer() {
     };
     setTracks((prev) => [...prev, newTrack]);
     
+    // Create audio channel for new track
     if (isInitialized) {
       createAudioChannel(newTrack);
     }
   };
 
   const deleteTrack = (trackId: string) => {
+    // Dispose audio channel
     const channel = audioChannelsRef.current.get(trackId);
     if (channel) {
       channel.synth.dispose();
@@ -300,10 +302,13 @@ export default function Mixer() {
     }
   }, [masterVolume, masterMuted]);
 
+  // Play a test note on a track
   const playTestNote = (trackId: string) => {
     const channel = audioChannelsRef.current.get(trackId);
     if (channel) {
-      channel.synth.triggerAttackRelease('C4', '8n');
+      const note = 'C4';
+      const duration = '8n';
+      channel.synth.triggerAttackRelease(note, duration);
     }
   };
 
@@ -409,9 +414,15 @@ export default function Mixer() {
                       playTestNote(track.id);
                     }}
                     className="px-3 py-1 rounded text-xs font-medium transition-all bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30"
+                    title="Test sound"
                   >
                     🎵
                   </button>
+                  <div className="flex-1 text-right">
+                    <span className="text-xs text-gray-500 font-mono">
+                      {track.volume > 0 ? '+' : ''}{track.volume.toFixed(1)} dB
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -419,41 +430,43 @@ export default function Mixer() {
         </div>
 
         {/* Main Mixer Area */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* Waveform */}
-          <div className="mb-6 bg-black/30 border border-white/10 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Audio Visualizer</h3>
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-xs text-gray-400">
-                  {isAnalyzing ? 'Monitoring' : 'Idle'}
-                </span>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 custom-scrollbar">
+          {/* Waveform Visualizer */}
+          <div className="mb-6">
+            <div className="bg-black/30 border border-white/10 rounded-2xl p-6 overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white">Audio Visualizer</h3>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-xs text-gray-400">
+                    {isAnalyzing ? 'Monitoring' : 'Idle'}
+                  </span>
+                </div>
               </div>
-            </div>
-            
-            <div className="relative h-48 flex items-center justify-center gap-1">
-              {waveformData.map((value, i) => {
-                const height = Math.abs(value) * 100 + 5;
-                const hue = (i / waveformData.length) * 360;
-                return (
-                  <div
-                    key={i}
-                    className="flex-1 rounded-t-full transition-all duration-75"
-                    style={{
-                      height: `${height}%`,
-                      backgroundColor: `hsl(${hue}, 70%, 60%)`,
-                      opacity: 0.8,
-                    }}
-                  />
-                );
-              })}
+              
+              <div className="relative h-48 flex items-center justify-center gap-1">
+                {waveformData.map((value, i) => {
+                  const height = Math.abs(value) * 100 + 5;
+                  const hue = (i / waveformData.length) * 360;
+                  return (
+                    <div
+                      key={i}
+                      className="flex-1 rounded-t-full transition-all duration-75"
+                      style={{
+                        height: `${height}%`,
+                        backgroundColor: `hsl(${hue}, 70%, 60%)`,
+                        opacity: 0.8,
+                      }}
+                    />
+                  );
+                })}
+              </div>
             </div>
           </div>
 
           {/* Track Controls */}
           {selectedTrackData && (
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div
                   className="w-4 h-4 rounded-full"
@@ -462,14 +475,18 @@ export default function Mixer() {
                 <h3 className="text-xl font-semibold text-white">
                   {selectedTrackData.name}
                 </h3>
+                <span className="px-2 py-1 bg-white/10 rounded text-xs text-gray-400">
+                  {selectedTrackData.type.toUpperCase()}
+                </span>
               </div>
 
               <div className="space-y-6">
-                {/* Volume */}
+                {/* Volume Control */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-sm font-medium text-gray-300">Volume</label>
                     <span className="text-sm font-mono text-white">
+                      {selectedTrackData.volume > 0 ? '+' : ''}
                       {selectedTrackData.volume.toFixed(1)} dB
                     </span>
                   </div>
@@ -482,16 +499,20 @@ export default function Mixer() {
                     onChange={(e) =>
                       handleVolumeChange(selectedTrackData.id, parseFloat(e.target.value))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer slider"
                   />
                 </div>
 
-                {/* Pan */}
+                {/* Pan Control */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-sm font-medium text-gray-300">Pan</label>
                     <span className="text-sm font-mono text-white">
-                      {selectedTrackData.pan === 0 ? 'Center' : selectedTrackData.pan < 0 ? 'L' : 'R'}
+                      {selectedTrackData.pan === 0
+                        ? 'Center'
+                        : selectedTrackData.pan < 0
+                        ? `${Math.abs(selectedTrackData.pan * 100).toFixed(0)}% L`
+                        : `${(selectedTrackData.pan * 100).toFixed(0)}% R`}
                     </span>
                   </div>
                   <input
@@ -503,15 +524,40 @@ export default function Mixer() {
                     onChange={(e) =>
                       handlePanChange(selectedTrackData.id, parseFloat(e.target.value))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer slider"
                   />
+                </div>
+
+                {/* Effects Section */}
+                <div className="pt-4 border-t border-white/10">
+                  <h4 className="text-sm font-medium text-gray-300 mb-3">Effects</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-all">
+                      Reverb
+                    </button>
+                    <button className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-all">
+                      Delay
+                    </button>
+                    <button className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-all">
+                      EQ
+                    </button>
+                    <button className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-all">
+                      Compress
+                    </button>
+                    <button className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-all">
+                      Distortion
+                    </button>
+                    <button className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-all">
+                      Filter
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Master */}
-          <div className="bg-gradient-to-br from-white/10 to-white/5 border-2 border-white/20 rounded-2xl p-6">
+          {/* Master Section */}
+          <div className="mt-6 bg-gradient-to-br from-white/10 to-white/5 border-2 border-white/20 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-white">Master Output</h3>
               <button
@@ -522,7 +568,7 @@ export default function Mixer() {
                     : 'bg-white/10 text-white border border-white/10'
                 }`}
               >
-                {masterMuted ? 'Unmute' : 'Mute'}
+                {masterMuted ? 'Unmute' : 'Mute'} Master
               </button>
             </div>
 
@@ -530,6 +576,7 @@ export default function Mixer() {
               <div className="flex items-center justify-between mb-3">
                 <label className="text-sm font-medium text-gray-300">Master Volume</label>
                 <span className="text-lg font-mono text-white font-bold">
+                  {masterVolume > 0 ? '+' : ''}
                   {masterVolume.toFixed(1)} dB
                 </span>
               </div>
@@ -540,12 +587,56 @@ export default function Mixer() {
                 step="0.1"
                 value={masterVolume}
                 onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
-                className="w-full h-3 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                className="w-full h-3 bg-white/10 rounded-lg appearance-none cursor-pointer slider"
               />
+            </div>
+
+            {/* VU Meters */}
+            <div className="mt-6 grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-gray-400 mb-2">Left</div>
+                <div className="h-2 bg-black/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all duration-150"
+                    style={{ width: `${Math.random() * 80 + 20}%` }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-2">Right</div>
+                <div className="h-2 bg-black/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all duration-150"
+                    style={{ width: `${Math.random() * 80 + 20}%` }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .slider::-webkit-slider-thumb {
+          appearance: none;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: white;
+          cursor: pointer;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .slider::-moz-range-thumb {
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: white;
+          cursor: pointer;
+          border: none;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+      `}</style>
     </div>
   );
 }

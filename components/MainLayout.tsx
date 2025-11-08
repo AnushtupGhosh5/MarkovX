@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import PianoRollGrid from './PianoRollGrid';
 import ShaderBackground from './shader-background';
 import TextToMusicPanel from './TextToMusicPanel';
@@ -9,11 +10,13 @@ import HummingToMusicPanel from './HummingToMusicPanel';
 import AICopilot from './AICopilot';
 import Mixer from './Mixer';
 import LyricsEditor from './LyricsEditor';
+import NewSongDialog from './NewSongDialog';
 import { useAudioEngine } from '@/src/hooks/useAudioEngine';
 import { useStore } from '@/src/store';
 import { UserProfile } from '@/components/auth';
 import { authService } from '@/lib/auth/authService';
-import { LogOut } from 'lucide-react';
+import { useSong } from '@/lib/hooks/useSong';
+import { LogOut, Music, FolderOpen } from 'lucide-react';
 
 type PanelView = 'pianoRoll' | 'lyrics' | 'mixer' | 'textToMusic' | 'melodyToMusic' | 'hummingToMusic';
 
@@ -25,6 +28,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [activePanel, setActivePanel] = useState<PanelView | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showNewSongDialog, setShowNewSongDialog] = useState(false);
+  
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const songId = searchParams.get('song');
+  const { song, loading: songLoading, addChatMessage } = useSong(songId);
   
   const { audioEngine, initializeAudio } = useAudioEngine();
   const { session } = useStore((state) => ({
@@ -81,38 +90,18 @@ export default function MainLayout({ children }: MainLayoutProps) {
     URL.revokeObjectURL(url);
   };
 
-  const handleNewSession = () => {
-    if (session.notes.length > 0 || session.generatedAudio.length > 0 || session.lyrics?.text) {
-      const confirmed = window.confirm('Start a new session? All unsaved changes will be lost.');
-      if (!confirmed) return;
-    }
-    
-    // Clear session
-    useStore.setState((state) => ({
-      session: {
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        tempo: 120,
-        keySignature: 'C',
-        timeSignature: [4, 4] as [number, number],
-        notes: [],
-        generatedAudio: [],
-        lyrics: {
-          text: '',
-          segments: [],
-        },
-        conversationHistory: [],
-      },
-      selectedNotes: [],
-    }));
-    
-    // Stop playback
-    audioEngine.stop();
-    setIsPlaying(false);
-    
-    // Reset to home
-    setActivePanel(null);
+  const handleNewSong = () => {
+    setShowNewSongDialog(true);
+  };
+
+  const handleSongCreated = (newSongId: string) => {
+    // Navigate to the new song
+    router.push(`/?song=${newSongId}`);
+    setShowNewSongDialog(false);
+  };
+
+  const handleGoToMySongs = () => {
+    router.push('/songs');
   };
 
   return (
@@ -122,9 +111,33 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <header className="relative z-30 flex items-center justify-between border-b border-white/10 bg-black/40 backdrop-blur-xl px-6 py-3">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold text-white">MusePilot</h1>
+          {song && (
+            <div className="flex items-center gap-2 ml-4 px-3 py-1 bg-purple-600/20 border border-purple-500/30 rounded-lg">
+              <Music size={16} className="text-purple-400" />
+              <span className="text-sm text-purple-300">{song.title}</span>
+            </div>
+          )}
         </div>
         
         <div className="flex items-center gap-2">
+          <button 
+            onClick={handleGoToMySongs}
+            className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/15 flex items-center gap-2 transition-colors"
+            title="My Songs"
+          >
+            <FolderOpen size={18} className="text-white" />
+            <span className="text-sm text-white">My Songs</span>
+          </button>
+          
+          <button 
+            onClick={handleNewSong}
+            className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 flex items-center gap-2 transition-colors"
+            title="New Song"
+          >
+            <Music size={18} className="text-white" />
+            <span className="text-sm text-white">New Song</span>
+          </button>
+          
           <button 
             onClick={handleExport}
             className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center transition-colors"
@@ -132,16 +145,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
           >
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-          </button>
-          
-          <button 
-            onClick={handleNewSession}
-            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center transition-colors"
-            title="New Session"
-          >
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           </button>
           
@@ -394,10 +397,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
         {/* AI Chat Panel */}
         {isChatOpen && (
           <div className="relative z-30">
-            <AICopilot onClose={() => setIsChatOpen(false)} />
+            <AICopilot 
+              onClose={() => setIsChatOpen(false)}
+              song={song}
+              onSaveChatMessage={addChatMessage}
+            />
           </div>
         )}
       </div>
+
+      <NewSongDialog
+        isOpen={showNewSongDialog}
+        onClose={() => setShowNewSongDialog(false)}
+        onSongCreated={handleSongCreated}
+      />
     </div>
   );
 }
