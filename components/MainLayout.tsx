@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import PianoRollGrid from './PianoRollGrid';
 import ShaderBackground from './shader-background';
 import TextToMusicPanel from './TextToMusicPanel';
+import MelodyToMusicPanel from './MelodyToMusicPanel';
+import HummingToMusicPanel from './HummingToMusicPanel';
 import AICopilot from './AICopilot';
 import { useAudioEngine } from '@/src/hooks/useAudioEngine';
 import { useStore } from '@/src/store';
 
-type PanelView = 'pianoRoll' | 'lyrics' | 'mixer' | 'textToMusic';
+type PanelView = 'pianoRoll' | 'lyrics' | 'mixer' | 'textToMusic' | 'melodyToMusic' | 'hummingToMusic';
 
 interface MainLayoutProps {
   children?: React.ReactNode;
@@ -121,6 +123,34 @@ export default function MainLayout({ children }: MainLayoutProps) {
             title="Text to Music"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+
+          <button
+            onClick={() => setActivePanel('melodyToMusic')}
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+              activePanel === 'melodyToMusic'
+                ? 'bg-white/10 text-white'
+                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+            }`}
+            title="Melody to Music"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          </button>
+
+          <button
+            onClick={() => setActivePanel('hummingToMusic')}
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+              activePanel === 'hummingToMusic'
+                ? 'bg-white/10 text-white'
+                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+            }`}
+            title="Humming to Music"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
             </svg>
           </button>
@@ -228,6 +258,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <div className="h-full p-8">
                 <div className="max-w-4xl mx-auto">
                   <TextToMusicPanel />
+                </div>
+              </div>
+            )}
+
+            {activePanel === 'melodyToMusic' && (
+              <div className="h-full p-8">
+                <div className="max-w-4xl mx-auto">
+                  <MelodyToMusicPanel />
+                </div>
+              </div>
+            )}
+
+            {activePanel === 'hummingToMusic' && (
+              <div className="h-full p-8">
+                <div className="max-w-4xl mx-auto">
+                  <HummingToMusicPanel />
                 </div>
               </div>
             )}

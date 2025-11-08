@@ -107,11 +107,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<TextToMus
       });
     }
     
-    // Call local Python MusicGen server
+    // Call MusicGen server (local or Colab)
     try {
-      console.log('[TextToMusic] Calling local MusicGen server...');
+      const serverUrl = process.env.MUSICGEN_SERVER_URL || 'http://localhost:8000';
+      console.log('[TextToMusic] Calling MusicGen server:', serverUrl);
       
-      const response = await fetch('http://localhost:8000/generate', {
+      const response = await fetch(`${serverUrl}/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -123,7 +124,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<TextToMus
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
+        let errorText = await response.text();
+        
+        // Try to parse JSON error
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorText = errorJson.error || errorJson.detail || errorText;
+        } catch {}
+        
         console.error('[TextToMusic] MusicGen server error:', {
           status: response.status,
           statusText: response.statusText,
@@ -143,7 +151,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<TextToMus
         return NextResponse.json(
           { 
             success: false, 
-            error: `MusicGen server error: ${response.status} - ${errorText}` 
+            error: `Server error: ${errorText}` 
           },
           { status: response.status }
         );

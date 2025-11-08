@@ -7,3 +7,11 @@ transformers==4.33.0
 scipy>=1.11.0
 pydantic==2.5.0
 accelerate>=0.20.0
+
+# Humming-to-Music Pipeline
+crepe==0.0.13
+librosa==0.10.1
+pretty_midi==0.2.10
+soundfile==0.12.1
+numpy>=1.24.0
+python-multipart==0.0.6

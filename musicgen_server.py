@@ -3,7 +3,7 @@ MusicGen Server - Local HuggingFace MusicGen API
 Runs facebook/musicgen-small model locally using transformers
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from transformers import MusicgenForConditionalGeneration, AutoProcessor
@@ -12,6 +12,15 @@ import scipy.io.wavfile
 import io
 import base64
 import logging
+import tempfile
+import os
+import numpy as np
+
+try:
+    import librosa
+    HAS_LIBROSA = True
+except ImportError:
+    HAS_LIBROSA = False
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -28,9 +37,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global model and processor
-model = None
-processor = None
+# Global models and processors
+text_model = None
+text_processor = None
+melody_model = None
+melody_processor = None
 
 class GenerateRequest(BaseModel):
     prompt: str
@@ -42,24 +53,39 @@ class GenerateResponse(BaseModel):
     error: str = None
 
 @app.on_event("startup")
-async def load_model():
-    """Load MusicGen model on startup"""
-    global model, processor
+async def load_models():
+    """Load MusicGen models on startup"""
+    global text_model, text_processor, melody_model, melody_processor
     try:
-        logger.info("Loading MusicGen model on CPU...")
+        logger.info("Loading MusicGen models on CPU...")
         
-        model = MusicgenForConditionalGeneration.from_pretrained(
+        # Load text-to-music model
+        logger.info("1/2 Loading text-to-music model...")
+        text_model = MusicgenForConditionalGeneration.from_pretrained(
             "facebook/musicgen-small",
             trust_remote_code=True
         )
-        
-        processor = AutoProcessor.from_pretrained(
+        text_processor = AutoProcessor.from_pretrained(
             "facebook/musicgen-small",
             trust_remote_code=True
         )
-        logger.info("✓ MusicGen model loaded successfully on CPU!")
+        logger.info("✓ Text-to-music model loaded")
+        
+        # Load melody-to-music model
+        logger.info("2/2 Loading melody-to-music model...")
+        melody_model = MusicgenForConditionalGeneration.from_pretrained(
+            "facebook/musicgen-melody",
+            trust_remote_code=True
+        )
+        melody_processor = AutoProcessor.from_pretrained(
+            "facebook/musicgen-melody",
+            trust_remote_code=True
+        )
+        logger.info("✓ Melody-to-music model loaded")
+        
+        logger.info("✓ Both models loaded successfully on CPU!")
     except Exception as e:
-        logger.error(f"Failed to load model: {e}")
+        logger.error(f"Failed to load models: {e}")
         logger.exception(e)
         raise
 
@@ -68,23 +94,26 @@ async def root():
     """Health check endpoint"""
     return {
         "status": "running",
-        "model": "facebook/musicgen-small",
-        "ready": model is not None and processor is not None
+        "models": {
+            "text_to_music": "facebook/musicgen-small",
+            "melody_to_music": "facebook/musicgen-melody"
+        },
+        "ready": text_model is not None and melody_model is not None
     }
 
 @app.post("/generate", response_model=GenerateResponse)
 async def generate_music(request: GenerateRequest):
     """Generate music from text prompt"""
-    global model, processor
+    global text_model, text_processor
     
-    if model is None or processor is None:
+    if text_model is None or text_processor is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
     
     try:
-        logger.info(f"Generating music: '{request.prompt}' ({request.duration}s)")
+        logger.info(f"Text→Music: '{request.prompt}' ({request.duration}s)")
         
         # Process input
-        inputs = processor(
+        inputs = text_processor(
             text=[request.prompt],
             padding=True,
             return_tensors="pt"
@@ -94,10 +123,10 @@ async def generate_music(request: GenerateRequest):
         max_new_tokens = int(request.duration * 50)
         
         # Generate audio
-        audio_values = model.generate(**inputs, max_new_tokens=max_new_tokens)
+        audio_values = text_model.generate(**inputs, max_new_tokens=max_new_tokens)
         
         # Get sampling rate
-        sampling_rate = model.config.audio_encoder.sampling_rate
+        sampling_rate = text_model.config.audio_encoder.sampling_rate
         
         # Convert to WAV in memory
         buffer = io.BytesIO()
@@ -107,7 +136,7 @@ async def generate_music(request: GenerateRequest):
         # Encode to base64
         audio_base64 = base64.b64encode(buffer.read()).decode('utf-8')
         
-        logger.info("✓ Audio generated successfully")
+        logger.info("✓ Generated successfully")
         
         return GenerateResponse(
             success=True,
@@ -116,6 +145,131 @@ async def generate_music(request: GenerateRequest):
         
     except Exception as e:
         logger.error(f"Generation failed: {e}")
+        return GenerateResponse(
+            success=False,
+            error=str(e)
+        )
+
+@app.post("/generate-from-melody", response_model=GenerateResponse)
+async def generate_from_melody(
+    audio_file: UploadFile = File(...),
+    prompt: str = Form(""),
+    duration: float = Form(10.0)
+):
+    """Generate music from humming/melody audio"""
+    global melody_model, melody_processor
+    
+    if melody_model is None or melody_processor is None:
+        raise HTTPException(status_code=503, detail="Melody model not loaded")
+    
+    try:
+        logger.info(f"Melody→Music: '{prompt}' ({duration}s)")
+        
+        # Read uploaded audio
+        audio_bytes = await audio_file.read()
+        
+        # Save to temp file (needed for audio loading)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as tmp_file:
+            tmp_file.write(audio_bytes)
+            tmp_path = tmp_file.name
+        
+        try:
+            # Use librosa if available (handles all formats without ffmpeg)
+            if HAS_LIBROSA:
+                audio_data, sample_rate = librosa.load(tmp_path, sr=None, mono=True)
+                logger.info(f"Loaded with librosa: {sample_rate}Hz, {len(audio_data)} samples")
+            else:
+                # Fallback to scipy (WAV only)
+                sample_rate, audio_data = scipy.io.wavfile.read(tmp_path)
+                
+                # Normalize
+                if audio_data.dtype == 'int16':
+                    audio_data = audio_data.astype('float32') / 32768.0
+                elif audio_data.dtype == 'int32':
+                    audio_data = audio_data.astype('float32') / 2147483648.0
+                
+                # Stereo to mono
+                if len(audio_data.shape) > 1:
+                    audio_data = audio_data.mean(axis=1)
+        finally:
+            # Windows fix: try to delete, ignore if locked
+            try:
+                os.unlink(tmp_path)
+            except PermissionError:
+                pass  # File will be cleaned up by OS eventually
+        
+        # Ensure audio_data is standard numpy array with float32
+        if isinstance(audio_data, torch.Tensor):
+            audio_data = audio_data.numpy()
+        audio_data = np.array(audio_data, dtype=np.float32)
+        
+        # Ensure mono (1D array)
+        if len(audio_data.shape) > 1:
+            audio_data = audio_data.mean(axis=0)
+        
+        logger.info(f"Audio shape before resample: {audio_data.shape}, dtype: {audio_data.dtype}")
+        
+        # Resample to model's expected rate (32kHz for MusicGen)
+        target_sr = melody_model.config.audio_encoder.sampling_rate
+        if sample_rate != target_sr:
+            audio_data = librosa.resample(audio_data, orig_sr=float(sample_rate), target_sr=float(target_sr))
+            sample_rate = target_sr
+            logger.info(f"Resampled to {target_sr}Hz")
+        
+        # Ensure sample_rate is Python int (not numpy)
+        sample_rate = int(sample_rate)
+        
+        # Ensure 1D array
+        audio_data = np.squeeze(audio_data)
+        logger.info(f"Final audio shape: {audio_data.shape}, sample_rate: {sample_rate}")
+        
+        # Process inputs with melody processor
+        if prompt:
+            # With text prompt
+            inputs = melody_processor(
+                audio=audio_data,
+                sampling_rate=sample_rate,
+                text=[prompt],
+                padding=True,
+                return_tensors="pt"
+            )
+        else:
+            # Audio only
+            inputs = melody_processor(
+                audio=audio_data,
+                sampling_rate=sample_rate,
+                padding=True,
+                return_tensors="pt"
+            )
+        
+        # Ensure correct key names for model
+        if 'input_features' in inputs:
+            inputs['input_values'] = inputs.pop('input_features')
+        
+        max_new_tokens = int(duration * 50)
+        
+        # Generate
+        audio_values = melody_model.generate(**inputs, max_new_tokens=max_new_tokens)
+        
+        # Convert to WAV
+        sampling_rate = melody_model.config.audio_encoder.sampling_rate
+        buffer = io.BytesIO()
+        scipy.io.wavfile.write(buffer, sampling_rate, audio_values[0, 0].cpu().numpy())
+        buffer.seek(0)
+        
+        audio_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+        
+        logger.info("✓ Generated successfully")
+        
+        return GenerateResponse(
+            success=True,
+            audio_base64=audio_base64
+        )
+        
+    except Exception as e:
+        logger.error(f"Melody generation failed: {e}")
+        import traceback
+        traceback.print_exc()
         return GenerateResponse(
             success=False,
             error=str(e)

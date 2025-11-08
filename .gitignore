@@ -43,3 +43,6 @@ venv310
 
 # generated audio files
 /public/audio
+output
+output.mid
+*.md
