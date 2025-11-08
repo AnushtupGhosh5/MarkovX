@@ -33,7 +33,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const songId = searchParams.get('song');
-  const { song, loading: songLoading } = useSong(songId);
+  const { song, loading: songLoading, addChatMessage } = useSong(songId);
   
   const { audioEngine, initializeAudio } = useAudioEngine();
   const { session } = useStore((state) => ({
@@ -397,7 +397,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
         {/* AI Chat Panel */}
         {isChatOpen && (
           <div className="relative z-30">
-            <AICopilot onClose={() => setIsChatOpen(false)} />
+            <AICopilot 
+              onClose={() => setIsChatOpen(false)}
+              song={song}
+              onSaveChatMessage={addChatMessage}
+            />
           </div>
         )}
       </div>

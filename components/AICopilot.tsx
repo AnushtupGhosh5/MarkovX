@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { generateText, GeminiAPIError } from '@/src/lib/api/gemini-client';
 import { useStore } from '@/src/store';
+import { Song, ChatMessage } from '@/lib/firebase/songService';
 
 interface Message {
   id: string;
@@ -13,9 +14,11 @@ interface Message {
 
 interface AICopilotProps {
   onClose: () => void;
+  song?: Song | null;
+  onSaveChatMessage?: (message: ChatMessage) => Promise<void>;
 }
 
-export default function AICopilot({ onClose }: AICopilotProps) {
+export default function AICopilot({ onClose, song, onSaveChatMessage }: AICopilotProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -23,18 +26,35 @@ export default function AICopilot({ onClose }: AICopilotProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { session } = useStore((state) => ({ session: state.session }));
 
-  // Initialize welcome message on mount to avoid hydration mismatch
+  // Initialize welcome message or load chat history
   useEffect(() => {
     setMounted(true);
-    setMessages([
-      {
-        id: '1',
-        role: 'assistant',
-        content: "Welcome to MusePilot! I'm your AI music assistant. Try asking me to:\n\n• Generate music from a prompt\n• Transpose notes\n• Change tempo or key\n• Generate lyrics\n• Suggest chord progressions",
-        timestamp: Date.now(),
-      },
-    ]);
-  }, []);
+    
+    if (song && song.ai_chat_context && song.ai_chat_context.length > 0) {
+      // Load chat history from song
+      const loadedMessages: Message[] = song.ai_chat_context.map((msg, index) => ({
+        id: `${msg.timestamp.getTime()}-${index}`,
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: msg.message,
+        timestamp: msg.timestamp.getTime(),
+      }));
+      setMessages(loadedMessages);
+    } else {
+      // Show welcome message
+      const welcomeContent = song
+        ? `Welcome back to "${song.title}"! I'm your AI music assistant. I can see you're working on a ${song.genre || 'song'} with a ${song.mood || 'creative'} mood. How can I help you today?`
+        : "Welcome to MusePilot! I'm your AI music assistant. Try asking me to:\n\n• Generate music from a prompt\n• Transpose notes\n• Change tempo or key\n• Generate lyrics\n• Suggest chord progressions";
+      
+      setMessages([
+        {
+          id: '1',
+          role: 'assistant',
+          content: welcomeContent,
+          timestamp: Date.now(),
+        },
+      ]);
+    }
+  }, [song]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -45,14 +65,55 @@ export default function AICopilot({ onClose }: AICopilotProps) {
   }, [messages]);
 
   const buildContext = () => {
-    return `Current session context:
-- Tempo: ${session.tempo} BPM
-- Key: ${session.keySignature}
-- Time Signature: ${session.timeSignature.join('/')}
-- Notes: ${session.notes.length} notes
-- Generated Audio: ${session.generatedAudio.length} tracks
-
-You are a helpful AI music assistant. Provide concise, actionable advice about music production, composition, and arrangement.`;
+    let context = `You are a helpful AI music assistant for MusePilot. Provide concise, actionable advice about music production, composition, and arrangement.\n\n`;
+    
+    // Add song context if available
+    if (song) {
+      context += `CURRENT SONG CONTEXT:\n`;
+      context += `- Title: "${song.title}"\n`;
+      if (song.genre) context += `- Genre: ${song.genre}\n`;
+      if (song.mood) context += `- Mood: ${song.mood}\n`;
+      if (song.tempo) context += `- Target Tempo: ${song.tempo}\n`;
+      if (song.key) context += `- Key: ${song.key}\n`;
+      if (song.style) context += `- Style: ${song.style}\n`;
+      if (song.instruments && song.instruments.length > 0) {
+        context += `- Instruments: ${song.instruments.join(', ')}\n`;
+      }
+      context += `- Version: ${song.version_number}\n`;
+      context += `- Audio Files Generated: ${song.audio_files.length}\n`;
+      if (song.notes) context += `- Notes: ${song.notes}\n`;
+      context += `\n`;
+    }
+    
+    // Add current session context
+    context += `CURRENT SESSION STATE:\n`;
+    context += `- Tempo: ${session.tempo} BPM\n`;
+    context += `- Key: ${session.keySignature}\n`;
+    context += `- Time Signature: ${session.timeSignature.join('/')}\n`;
+    context += `- Notes in Piano Roll: ${session.notes.length}\n`;
+    context += `- Generated Audio Tracks: ${session.generatedAudio.length}\n`;
+    
+    // Add lyrics if available
+    if (session.lyrics?.text) {
+      context += `- Lyrics: ${session.lyrics.text.substring(0, 200)}${session.lyrics.text.length > 200 ? '...' : ''}\n`;
+    }
+    
+    context += `\n`;
+    
+    // Add conversation history context
+    if (messages.length > 1) {
+      context += `CONVERSATION HISTORY:\n`;
+      const recentMessages = messages.slice(-6); // Last 3 exchanges
+      recentMessages.forEach((msg) => {
+        const role = msg.role === 'user' ? 'User' : 'Assistant';
+        context += `${role}: ${msg.content.substring(0, 150)}${msg.content.length > 150 ? '...' : ''}\n`;
+      });
+      context += `\n`;
+    }
+    
+    context += `Based on this context, provide helpful, specific guidance for this song.`;
+    
+    return context;
   };
 
   const handleSend = async () => {
@@ -69,6 +130,19 @@ You are a helpful AI music assistant. Provide concise, actionable advice about m
     setInput('');
     setIsLoading(true);
 
+    // Save user message to Firebase if in song context
+    if (song && onSaveChatMessage) {
+      try {
+        await onSaveChatMessage({
+          sender: 'user',
+          message: userMessage.content,
+          timestamp: new Date(userMessage.timestamp),
+        });
+      } catch (error) {
+        console.error('Failed to save user message:', error);
+      }
+    }
+
     try {
       const context = buildContext();
       const prompt = `${context}\n\nUser: ${userMessage.content}\n\nAssistant:`;
@@ -83,6 +157,19 @@ You are a helpful AI music assistant. Provide concise, actionable advice about m
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // Save assistant message to Firebase if in song context
+      if (song && onSaveChatMessage) {
+        try {
+          await onSaveChatMessage({
+            sender: 'ai',
+            message: assistantMessage.content,
+            timestamp: new Date(assistantMessage.timestamp),
+          });
+        } catch (error) {
+          console.error('Failed to save assistant message:', error);
+        }
+      }
     } catch (error) {
       console.error('Error generating response:', error);
       
@@ -112,9 +199,19 @@ You are a helpful AI music assistant. Provide concise, actionable advice about m
     <aside className="flex w-96 flex-col border-l border-white/10 bg-black/50 backdrop-blur-xl h-full relative z-10">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5 flex-shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
-          <h3 className="font-medium text-white text-sm">AI Assistant</h3>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2.5">
+            <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
+            <h3 className="font-medium text-white text-sm">AI Co-Pilot</h3>
+          </div>
+          {song && (
+            <div className="flex items-center gap-1.5 ml-4">
+              <svg className="h-3 w-3 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+              </svg>
+              <span className="text-xs text-purple-400">Song Context Active</span>
+            </div>
+          )}
         </div>
         <button
           onClick={onClose}

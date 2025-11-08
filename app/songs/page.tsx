@@ -13,6 +13,7 @@ export default function MySongsPage() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewSongDialog, setShowNewSongDialog] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -31,10 +32,13 @@ export default function MySongsPage() {
     
     try {
       setLoading(true);
+      setError(null);
       const userSongs = await songService.getUserSongs(user.uid);
       setSongs(userSongs);
-    } catch (error) {
+      console.log('Loaded songs:', userSongs.length);
+    } catch (error: any) {
       console.error('Failed to load songs:', error);
+      setError(error.message || 'Failed to load songs. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -91,14 +95,46 @@ export default function MySongsPage() {
               {songs.length} {songs.length === 1 ? 'song' : 'songs'} in your workspace
             </p>
           </div>
-          <button
-            onClick={() => setShowNewSongDialog(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-          >
-            <Plus size={20} />
-            New Song
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={loadSongs}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/15 rounded-lg transition-colors disabled:opacity-50"
+              title="Refresh songs"
+            >
+              <svg className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setShowNewSongDialog(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+            >
+              <Plus size={20} />
+              New Song
+            </button>
+          </div>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-600/20 border border-red-500/50 rounded-lg">
+            <div className="flex items-start gap-3">
+              <svg className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <div className="flex-1">
+                <h3 className="text-red-400 font-semibold mb-1">Error Loading Songs</h3>
+                <p className="text-red-300 text-sm">{error}</p>
+                <button
+                  onClick={loadSongs}
+                  className="mt-3 text-sm text-red-400 hover:text-red-300 underline"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {songs.length === 0 ? (
           <div className="text-center py-16">

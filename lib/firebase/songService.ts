@@ -112,10 +112,11 @@ export const songService = {
   // Get all songs for a user
   async getUserSongs(userId: string): Promise<Song[]> {
     try {
+      // Query without orderBy to avoid index requirement
+      // Songs will be sorted client-side
       const q = query(
         collection(db, SONGS_COLLECTION),
-        where('user_id', '==', userId),
-        orderBy('last_updated', 'desc')
+        where('user_id', '==', userId)
       );
 
       const querySnapshot = await getDocs(q);
@@ -135,10 +136,21 @@ export const songService = {
         } as Song);
       });
 
+      // Sort by last_updated descending (client-side)
+      songs.sort((a, b) => b.last_updated.getTime() - a.last_updated.getTime());
+
       return songs;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting user songs:', error);
-      throw new Error('Failed to get user songs');
+      
+      // Provide more detailed error message
+      if (error.code === 'permission-denied') {
+        throw new Error('Permission denied. Please check Firestore security rules.');
+      } else if (error.message?.includes('index')) {
+        throw new Error('Database index required. Please check Firebase Console.');
+      }
+      
+      throw new Error(`Failed to get user songs: ${error.message || 'Unknown error'}`);
     }
   },
 
