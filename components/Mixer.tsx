@@ -5,10 +5,6 @@ import { useStore } from '@/src/store';
 import * as Tone from 'tone';
 
 interface Track {
-import { useState } from 'react';
-import { useStore } from '@/src/store';
-
-interface TrackChannel {
   id: string;
   name: string;
   volume: number;
@@ -169,20 +165,6 @@ export default function Mixer() {
     return audioChannel;
   };
 
-  // Initialize audio analyzer
-  useEffect(() => {
-    if (!analyserRef.current) {
-      analyserRef.current = new Tone.Analyser('waveform', 64);
-      Tone.getDestination().connect(analyserRef.current);
-    }
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, []);
-
   // Animate waveform
   useEffect(() => {
     const animate = () => {
@@ -216,7 +198,6 @@ export default function Mixer() {
     if (channel) {
       channel.volume.volume.value = volume;
       channel.channel.volume.value = volume;
-      console.log(`🔊 Track ${trackId} volume set to ${volume} dB`);
     }
   };
 
@@ -232,7 +213,6 @@ export default function Mixer() {
     if (channel) {
       channel.panner.pan.value = pan;
       channel.channel.pan.value = pan;
-      console.log(`🎚️ Track ${trackId} pan set to ${pan}`);
     }
   };
 
@@ -246,7 +226,6 @@ export default function Mixer() {
           const channel = audioChannelsRef.current.get(trackId);
           if (channel) {
             channel.channel.mute = newMuted;
-            console.log(`🔇 Track ${trackId} mute: ${newMuted}`);
           }
           
           return { ...track, muted: newMuted };
@@ -262,23 +241,20 @@ export default function Mixer() {
         track.id === trackId ? { ...track, solo: !track.solo } : track
       );
 
-      // Handle solo logic: mute all non-solo tracks if any track is soloed
+      // Handle solo logic
       const hasSolo = newTracks.some(t => t.solo);
       
       newTracks.forEach(track => {
         const channel = audioChannelsRef.current.get(track.id);
         if (channel) {
           if (hasSolo) {
-            // If there are solo tracks, mute non-solo tracks
             channel.channel.mute = !track.solo;
           } else {
-            // If no solo tracks, respect individual mute settings
             channel.channel.mute = track.muted;
           }
         }
       });
 
-      console.log(`🎵 Solo toggled for track ${trackId}`);
       return newTracks;
     });
   };
@@ -296,15 +272,12 @@ export default function Mixer() {
     };
     setTracks((prev) => [...prev, newTrack]);
     
-    // Create audio channel for new track
     if (isInitialized) {
       createAudioChannel(newTrack);
-      console.log(`✅ Added track: ${newTrack.name}`);
     }
   };
 
   const deleteTrack = (trackId: string) => {
-    // Dispose audio channel
     const channel = audioChannelsRef.current.get(trackId);
     if (channel) {
       channel.synth.dispose();
@@ -312,7 +285,6 @@ export default function Mixer() {
       channel.panner.dispose();
       channel.channel.dispose();
       audioChannelsRef.current.delete(trackId);
-      console.log(`🗑️ Deleted track: ${trackId}`);
     }
 
     setTracks((prev) => prev.filter((track) => track.id !== trackId));
@@ -325,65 +297,15 @@ export default function Mixer() {
   useEffect(() => {
     if (masterVolumeRef.current) {
       masterVolumeRef.current.volume.value = masterMuted ? -Infinity : masterVolume;
-      console.log(`🎛️ Master volume: ${masterMuted ? 'MUTED' : `${masterVolume} dB`}`);
     }
   }, [masterVolume, masterMuted]);
 
-  // Play a test note on a track (for testing)
   const playTestNote = (trackId: string) => {
     const channel = audioChannelsRef.current.get(trackId);
     if (channel) {
-      const note = 'C4';
-      const duration = '8n';
-      channel.synth.triggerAttackRelease(note, duration);
-      console.log(`🎹 Played test note on track ${trackId}`);
+      channel.synth.triggerAttackRelease('C4', '8n');
     }
   };
-
-  // Route MIDI notes to specific track
-  const playNoteOnTrack = (trackId: string, midiNote: number, duration: number, velocity: number = 100) => {
-    const channel = audioChannelsRef.current.get(trackId);
-    if (channel && !channel.channel.mute) {
-      const note = Tone.Frequency(midiNote, 'midi').toNote();
-      const velocityNormalized = velocity / 127;
-      channel.synth.triggerAttackRelease(note, duration, undefined, velocityNormalized);
-    }
-  };
-
-  // Schedule MIDI notes on a track
-  const scheduleNotesOnTrack = (trackId: string, notes: Array<{pitch: number, start: number, duration: number, velocity: number}>) => {
-    const channel = audioChannelsRef.current.get(trackId);
-    if (!channel) return;
-
-    notes.forEach(note => {
-      const toneNote = Tone.Frequency(note.pitch, 'midi').toNote();
-      const velocityNormalized = note.velocity / 127;
-      const startTime = `${note.start}:0:0`;
-      const noteDuration = `${note.duration}:0:0`;
-
-      Tone.Transport.schedule((time) => {
-        if (!channel.channel.mute) {
-          channel.synth.triggerAttackRelease(toneNote, noteDuration, time, velocityNormalized);
-        }
-      }, startTime);
-    });
-
-    console.log(`🎼 Scheduled ${notes.length} notes on track ${trackId}`);
-  };
-
-  // Expose mixer functions to parent components via ref or context
-  useEffect(() => {
-    // Store mixer functions in window for global access (temporary solution)
-    if (typeof window !== 'undefined') {
-      (window as any).mixerAPI = {
-        playNoteOnTrack,
-        scheduleNotesOnTrack,
-        playTestNote,
-        getTracks: () => tracks,
-        getAudioChannel: (trackId: string) => audioChannelsRef.current.get(trackId),
-      };
-    }
-  }, [tracks]);
 
   const selectedTrackData = tracks.find((t) => t.id === selectedTrack);
 
@@ -464,83 +386,6 @@ export default function Mixer() {
                       track.muted
                         ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                         : 'bg-white/5 text-gray-400 border border-white/10'
-}
-
-export default function Mixer() {
-  const { session, updateSession } = useStore((state) => ({
-    session: state.session,
-    updateSession: state.updateSession,
-  }));
-
-  const [tracks, setTracks] = useState<TrackChannel[]>([
-    { id: '1', name: 'Master', volume: 75, pan: 0, muted: false, solo: false, color: 'cyan' },
-    { id: '2', name: 'Melody', volume: 70, pan: 0, muted: false, solo: false, color: 'purple' },
-    { id: '3', name: 'Bass', volume: 65, pan: -10, muted: false, solo: false, color: 'green' },
-    { id: '4', name: 'Drums', volume: 80, pan: 0, muted: false, solo: false, color: 'orange' },
-    { id: '5', name: 'Synth', volume: 60, pan: 15, muted: false, solo: false, color: 'pink' },
-  ]);
-
-  const updateTrack = (id: string, updates: Partial<TrackChannel>) => {
-    setTracks(tracks.map(track => 
-      track.id === id ? { ...track, ...updates } : track
-    ));
-  };
-
-  const toggleMute = (id: string) => {
-    const track = tracks.find(t => t.id === id);
-    if (track) {
-      updateTrack(id, { muted: !track.muted });
-    }
-  };
-
-  const toggleSolo = (id: string) => {
-    const track = tracks.find(t => t.id === id);
-    if (track) {
-      updateTrack(id, { solo: !track.solo });
-    }
-  };
-
-  return (
-    <div className="h-full flex flex-col relative z-10">
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold text-white mb-1">Mixer</h2>
-        <p className="text-sm text-gray-400">Control volume, pan, and effects for each track</p>
-      </div>
-
-      {/* Master Controls */}
-      <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-md">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-white">Master</h3>
-          <span className="text-xs font-mono text-gray-400">{tracks[0]?.volume}%</span>
-        </div>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={tracks[0]?.volume || 75}
-          onChange={(e) => updateTrack('1', { volume: parseInt(e.target.value) })}
-          className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer"
-        />
-      </div>
-
-      {/* Track Channels */}
-      <div className="flex-1 overflow-auto custom-scrollbar">
-        <div className="grid grid-cols-4 gap-4">
-          {tracks.slice(1).map((track) => (
-            <div
-              key={track.id}
-              className="bg-white/5 border border-white/10 rounded-md p-3 flex flex-col"
-            >
-              {/* Track Header */}
-              <div className="mb-3">
-                <h4 className="text-sm font-medium text-white mb-2">{track.name}</h4>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => toggleMute(track.id)}
-                    className={`flex-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
-                      track.muted
-                        ? 'bg-red-500/20 text-red-400'
-                        : 'bg-white/5 text-gray-500 hover:text-gray-300'
                     }`}
                   >
                     M
@@ -554,11 +399,6 @@ export default function Mixer() {
                       track.solo
                         ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
                         : 'bg-white/5 text-gray-400 border border-white/10'
-                    onClick={() => toggleSolo(track.id)}
-                    className={`flex-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
-                      track.solo
-                        ? 'bg-yellow-500/20 text-yellow-400'
-                        : 'bg-white/5 text-gray-500 hover:text-gray-300'
                     }`}
                   >
                     S
@@ -569,15 +409,9 @@ export default function Mixer() {
                       playTestNote(track.id);
                     }}
                     className="px-3 py-1 rounded text-xs font-medium transition-all bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30"
-                    title="Test sound"
                   >
                     🎵
                   </button>
-                  <div className="flex-1 text-right">
-                    <span className="text-xs text-gray-500 font-mono">
-                      {track.volume > 0 ? '+' : ''}{track.volume.toFixed(1)} dB
-                    </span>
-                  </div>
                 </div>
               </div>
             ))}
@@ -585,43 +419,41 @@ export default function Mixer() {
         </div>
 
         {/* Main Mixer Area */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 custom-scrollbar">
-          {/* Waveform Visualizer */}
-          <div className="mb-6">
-            <div className="bg-black/30 border border-white/10 rounded-2xl p-6 overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">Audio Visualizer</h3>
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-xs text-gray-400">
-                    {isAnalyzing ? 'Monitoring' : 'Idle'}
-                  </span>
-                </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Waveform */}
+          <div className="mb-6 bg-black/30 border border-white/10 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Audio Visualizer</h3>
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-xs text-gray-400">
+                  {isAnalyzing ? 'Monitoring' : 'Idle'}
+                </span>
               </div>
-              
-              <div className="relative h-48 flex items-center justify-center gap-1">
-                {waveformData.map((value, i) => {
-                  const height = Math.abs(value) * 100 + 5;
-                  const hue = (i / waveformData.length) * 360;
-                  return (
-                    <div
-                      key={i}
-                      className="flex-1 rounded-t-full transition-all duration-75"
-                      style={{
-                        height: `${height}%`,
-                        backgroundColor: `hsl(${hue}, 70%, 60%)`,
-                        opacity: 0.8,
-                      }}
-                    />
-                  );
-                })}
-              </div>
+            </div>
+            
+            <div className="relative h-48 flex items-center justify-center gap-1">
+              {waveformData.map((value, i) => {
+                const height = Math.abs(value) * 100 + 5;
+                const hue = (i / waveformData.length) * 360;
+                return (
+                  <div
+                    key={i}
+                    className="flex-1 rounded-t-full transition-all duration-75"
+                    style={{
+                      height: `${height}%`,
+                      backgroundColor: `hsl(${hue}, 70%, 60%)`,
+                      opacity: 0.8,
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
 
           {/* Track Controls */}
           {selectedTrackData && (
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
               <div className="flex items-center gap-3 mb-6">
                 <div
                   className="w-4 h-4 rounded-full"
@@ -630,18 +462,14 @@ export default function Mixer() {
                 <h3 className="text-xl font-semibold text-white">
                   {selectedTrackData.name}
                 </h3>
-                <span className="px-2 py-1 bg-white/10 rounded text-xs text-gray-400">
-                  {selectedTrackData.type.toUpperCase()}
-                </span>
               </div>
 
               <div className="space-y-6">
-                {/* Volume Control */}
+                {/* Volume */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-sm font-medium text-gray-300">Volume</label>
                     <span className="text-sm font-mono text-white">
-                      {selectedTrackData.volume > 0 ? '+' : ''}
                       {selectedTrackData.volume.toFixed(1)} dB
                     </span>
                   </div>
@@ -654,20 +482,16 @@ export default function Mixer() {
                     onChange={(e) =>
                       handleVolumeChange(selectedTrackData.id, parseFloat(e.target.value))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer slider"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer"
                   />
                 </div>
 
-                {/* Pan Control */}
+                {/* Pan */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-sm font-medium text-gray-300">Pan</label>
                     <span className="text-sm font-mono text-white">
-                      {selectedTrackData.pan === 0
-                        ? 'Center'
-                        : selectedTrackData.pan < 0
-                        ? `${Math.abs(selectedTrackData.pan * 100).toFixed(0)}% L`
-                        : `${(selectedTrackData.pan * 100).toFixed(0)}% R`}
+                      {selectedTrackData.pan === 0 ? 'Center' : selectedTrackData.pan < 0 ? 'L' : 'R'}
                     </span>
                   </div>
                   <input
@@ -679,40 +503,15 @@ export default function Mixer() {
                     onChange={(e) =>
                       handlePanChange(selectedTrackData.id, parseFloat(e.target.value))
                     }
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer slider"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer"
                   />
-                </div>
-
-                {/* Effects Section */}
-                <div className="pt-4 border-t border-white/10">
-                  <h4 className="text-sm font-medium text-gray-300 mb-3">Effects</h4>
-                  <div className="grid grid-cols-3 gap-3">
-                    <button className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-all">
-                      Reverb
-                    </button>
-                    <button className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-all">
-                      Delay
-                    </button>
-                    <button className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-all">
-                      EQ
-                    </button>
-                    <button className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-all">
-                      Compress
-                    </button>
-                    <button className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-all">
-                      Distortion
-                    </button>
-                    <button className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-all">
-                      Filter
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Master Section */}
-          <div className="mt-6 bg-gradient-to-br from-white/10 to-white/5 border-2 border-white/20 rounded-2xl p-6">
+          {/* Master */}
+          <div className="bg-gradient-to-br from-white/10 to-white/5 border-2 border-white/20 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-white">Master Output</h3>
               <button
@@ -723,7 +522,7 @@ export default function Mixer() {
                     : 'bg-white/10 text-white border border-white/10'
                 }`}
               >
-                {masterMuted ? 'Unmute' : 'Mute'} Master
+                {masterMuted ? 'Unmute' : 'Mute'}
               </button>
             </div>
 
@@ -731,7 +530,6 @@ export default function Mixer() {
               <div className="flex items-center justify-between mb-3">
                 <label className="text-sm font-medium text-gray-300">Master Volume</label>
                 <span className="text-lg font-mono text-white font-bold">
-                  {masterVolume > 0 ? '+' : ''}
                   {masterVolume.toFixed(1)} dB
                 </span>
               </div>
@@ -742,109 +540,10 @@ export default function Mixer() {
                 step="0.1"
                 value={masterVolume}
                 onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
-                className="w-full h-3 bg-white/10 rounded-lg appearance-none cursor-pointer slider"
+                className="w-full h-3 bg-white/10 rounded-lg appearance-none cursor-pointer"
               />
             </div>
-
-            {/* VU Meters */}
-            <div className="mt-6 grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-xs text-gray-400 mb-2">Left</div>
-                <div className="h-2 bg-black/30 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all duration-150"
-                    style={{ width: `${Math.random() * 80 + 20}%` }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-400 mb-2">Right</div>
-                <div className="h-2 bg-black/30 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all duration-150"
-                    style={{ width: `${Math.random() * 80 + 20}%` }}
-                  />
-                </div>
-              </div>
-            </div>
           </div>
-        </div>
-      </div>
-
-      <style jsx>{`
-        .slider::-webkit-slider-thumb {
-          appearance: none;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: white;
-          cursor: pointer;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-        }
-
-        .slider::-moz-range-thumb {
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: white;
-          cursor: pointer;
-          border: none;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-        }
-      `}</style>
-                </div>
-              </div>
-
-              {/* Volume Fader */}
-              <div className="flex-1 flex flex-col items-center mb-3">
-                <div className="text-xs text-gray-500 mb-2">Vol</div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={track.volume}
-                  onChange={(e) => updateTrack(track.id, { volume: parseInt(e.target.value) })}
-                  className="h-24 bg-white/10 rounded appearance-none cursor-pointer"
-                  style={{
-                    WebkitAppearance: 'slider-vertical',
-                    width: '6px',
-                  } as React.CSSProperties}
-                />
-                <div className="text-xs font-mono text-gray-400 mt-2">{track.volume}</div>
-              </div>
-
-              {/* Pan Control */}
-              <div>
-                <div className="text-xs text-gray-500 mb-1 text-center">Pan</div>
-                <input
-                  type="range"
-                  min="-50"
-                  max="50"
-                  value={track.pan}
-                  onChange={(e) => updateTrack(track.id, { pan: parseInt(e.target.value) })}
-                  className="w-full h-1 bg-white/10 rounded appearance-none cursor-pointer"
-                />
-                <div className="text-center text-xs font-mono text-gray-500 mt-1">
-                  {track.pan > 0 ? `R${track.pan}` : track.pan < 0 ? `L${Math.abs(track.pan)}` : 'C'}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Bottom Actions */}
-      <div className="mt-6 flex items-center justify-between py-3 border-t border-white/10">
-        <div className="flex items-center gap-2">
-          <button className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white rounded-md transition-colors text-sm">
-            Add Track
-          </button>
-          <button className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">
-            Reset
-          </button>
-        </div>
-        <div className="text-xs text-gray-500">
-          {tracks.filter(t => t.muted).length} muted • {tracks.filter(t => t.solo).length} solo
         </div>
       </div>
     </div>
