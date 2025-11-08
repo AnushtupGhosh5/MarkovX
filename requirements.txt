@@ -1,0 +1,23 @@
+flask==3.0.0
+flask-cors==4.0.0
+torch==2.1.0
+audiocraft==1.3.0
+scipy==1.11.4
+numpy==1.26.2
+# Python dependencies for MusicGen Server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+# Install PyTorch with CUDA support from official source
+# torch>=2.0.0  # Use the command below instead
+transformers==4.33.0
+scipy>=1.11.0
+pydantic==2.5.0
+accelerate>=0.20.0
+
+# Humming-to-Music Pipeline
+crepe==0.0.13
+librosa==0.10.1
+pretty_midi==0.2.10
+soundfile==0.12.1
+numpy>=1.24.0
+python-multipart==0.0.6

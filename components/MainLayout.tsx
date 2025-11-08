@@ -1,15 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import PianoRollGrid from './PianoRollGrid';
 import ShaderBackground from './shader-background';
+import TextToMusicPanel from './TextToMusicPanel';
+import MelodyToMusicPanel from './MelodyToMusicPanel';
+import HummingToMusicPanel from './HummingToMusicPanel';
 import AICopilot from './AICopilot';
 import Mixer from './Mixer';
 import LyricsEditor from './LyricsEditor';
 import { useAudioEngine } from '@/src/hooks/useAudioEngine';
 import { useStore } from '@/src/store';
+import { UserProfile } from '@/components/auth';
+import { authService } from '@/lib/auth/authService';
+import { LogOut } from 'lucide-react';
 
-type PanelView = 'pianoRoll' | 'lyrics' | 'mixer';
+type PanelView = 'pianoRoll' | 'lyrics' | 'mixer' | 'textToMusic' | 'melodyToMusic' | 'hummingToMusic';
 
 interface MainLayoutProps {
   children?: React.ReactNode;
@@ -47,35 +53,111 @@ export default function MainLayout({ children }: MainLayoutProps) {
     setIsPlaying(false);
   };
 
+  const handleSignOut = async () => {
+    try {
+      await authService.signOut();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
+  const handleExport = () => {
+    // Export session as JSON
+    const sessionData = {
+      ...session,
+      exportedAt: new Date().toISOString(),
+    };
+    
+    const dataStr = JSON.stringify(sessionData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `musepilot-session-${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleNewSession = () => {
+    if (session.notes.length > 0 || session.generatedAudio.length > 0 || session.lyrics?.text) {
+      const confirmed = window.confirm('Start a new session? All unsaved changes will be lost.');
+      if (!confirmed) return;
+    }
+    
+    // Clear session
+    useStore.setState((state) => ({
+      session: {
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        tempo: 120,
+        keySignature: 'C',
+        timeSignature: [4, 4] as [number, number],
+        notes: [],
+        generatedAudio: [],
+        lyrics: {
+          text: '',
+          segments: [],
+        },
+        conversationHistory: [],
+      },
+      selectedNotes: [],
+    }));
+    
+    // Stop playback
+    audioEngine.stop();
+    setIsPlaying(false);
+    
+    // Reset to home
+    setActivePanel(null);
+  };
+
   return (
     <div className="flex h-screen flex-col text-white relative">
       <ShaderBackground />
       {/* Header */}
-      <header className="relative z-10 flex items-center justify-between border-b border-white/5 bg-black/20 backdrop-blur-sm px-6 py-4">
+      <header className="relative z-30 flex items-center justify-between border-b border-white/10 bg-black/40 backdrop-blur-xl px-6 py-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold text-white">MusePilot</h1>
-          <span className="text-sm text-gray-400">AI Music Production</span>
+          <h1 className="text-xl font-semibold text-white">MusePilot</h1>
         </div>
         
-        <div className="flex items-center gap-3">
-          <button className="rounded-lg bg-white text-black px-5 py-2 text-sm font-medium hover:bg-gray-100 transition-colors duration-200">
-            Export MP3
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleExport}
+            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center transition-colors"
+            title="Export Session"
+          >
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
           </button>
-          <button className="rounded-lg bg-white/10 hover:bg-white/15 text-white px-5 py-2 text-sm font-medium border border-white/10 transition-colors duration-200">
-            New Session
+          
+          <button 
+            onClick={handleNewSession}
+            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center transition-colors"
+            title="New Session"
+          >
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
           </button>
+          
+          <UserProfile />
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="relative z-10 flex w-16 flex-col items-center gap-2 border-r border-white/5 bg-black/20 backdrop-blur-sm py-6">
+        <aside className="relative z-30 flex w-16 flex-col items-center gap-2 border-r border-white/10 bg-black/40 backdrop-blur-xl py-6">
           <button
             onClick={() => setActivePanel('pianoRoll')}
-            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
               activePanel === 'pianoRoll'
-                ? 'bg-white/10 text-white'
-                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                ? 'bg-white/15 text-white border border-white/20'
+                : 'text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
             title="Piano Roll"
           >
@@ -86,10 +168,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           <button
             onClick={() => setActivePanel('lyrics')}
-            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
               activePanel === 'lyrics'
-                ? 'bg-white/10 text-white'
-                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                ? 'bg-white/15 text-white border border-white/20'
+                : 'text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
             title="Lyrics"
           >
@@ -100,10 +182,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           <button
             onClick={() => setActivePanel('mixer')}
-            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
               activePanel === 'mixer'
-                ? 'bg-white/10 text-white'
-                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                ? 'bg-white/15 text-white border border-white/20'
+                : 'text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
             title="Mixer"
           >
@@ -112,14 +194,56 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </svg>
           </button>
 
+          <button
+            onClick={() => setActivePanel('textToMusic')}
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
+              activePanel === 'textToMusic'
+                ? 'bg-white/15 text-white border border-white/20'
+                : 'text-gray-400 hover:bg-white/10 hover:text-white'
+            }`}
+            title="Text to Music"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+
+          <button
+            onClick={() => setActivePanel('melodyToMusic')}
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+              activePanel === 'melodyToMusic'
+                ? 'bg-white/10 text-white'
+                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+            }`}
+            title="Melody to Music"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          </button>
+
+          <button
+            onClick={() => setActivePanel('hummingToMusic')}
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+              activePanel === 'hummingToMusic'
+                ? 'bg-white/10 text-white'
+                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+            }`}
+            title="Humming to Music"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+          </button>
+
           <div className="flex-1" />
 
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
               isChatOpen
-                ? 'bg-white/10 text-white'
-                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                ? 'bg-white/15 text-white border border-white/20'
+                : 'text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
             title="AI Co-Pilot"
           >
@@ -130,9 +254,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </aside>
 
         {/* Main Workspace */}
-        <main className="relative flex flex-1 flex-col overflow-hidden">
+        <main className="relative z-10 flex flex-1 flex-col overflow-hidden bg-gray-950/50">
           {/* Panel Content Area */}
-          <div className="flex-1 overflow-auto p-8">
+          <div className="flex-1 overflow-auto p-8 relative z-10">
             {!activePanel && (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center space-y-6 max-w-2xl">
@@ -144,16 +268,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   </p>
                   <div className="flex items-center justify-center gap-4 pt-8">
                     <button
-                      onClick={() => setActivePanel('pianoRoll')}
-                      className="px-6 py-3 bg-white/10 hover:bg-white/15 text-white rounded-xl border border-white/10 transition-all duration-200"
+                      onClick={() => setActivePanel('textToMusic')}
+                      className="px-6 py-3 bg-white text-black hover:bg-gray-100 rounded-lg font-medium transition-colors"
                     >
-                      Open Piano Roll
+                      Generate Music
+                    </button>
+                    <button
+                      onClick={() => setActivePanel('pianoRoll')}
+                      className="px-6 py-3 bg-white/10 hover:bg-white/15 text-white rounded-lg border border-white/15 transition-colors font-medium"
+                    >
+                      Piano Roll
                     </button>
                     <button
                       onClick={() => setActivePanel('mixer')}
-                      className="px-6 py-3 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl border border-white/5 transition-all duration-200"
+                      className="px-6 py-3 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg border border-white/10 transition-colors"
                     >
-                      Open Mixer
+                      Mixer
                     </button>
                   </div>
                 </div>
@@ -161,7 +291,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             )}
 
             {activePanel === 'pianoRoll' && (
-              <div className="h-full">
+              <div className="absolute inset-0">
                 <PianoRollGrid />
               </div>
             )}
@@ -178,11 +308,35 @@ export default function MainLayout({ children }: MainLayoutProps) {
               </div>
             )}
 
+            {activePanel === 'textToMusic' && (
+              <div className="h-full p-8">
+                <div className="max-w-4xl mx-auto">
+                  <TextToMusicPanel />
+                </div>
+              </div>
+            )}
+
+            {activePanel === 'melodyToMusic' && (
+              <div className="h-full p-8">
+                <div className="max-w-4xl mx-auto">
+                  <MelodyToMusicPanel />
+                </div>
+              </div>
+            )}
+
+            {activePanel === 'hummingToMusic' && (
+              <div className="h-full p-8">
+                <div className="max-w-4xl mx-auto">
+                  <HummingToMusicPanel />
+                </div>
+              </div>
+            )}
+
             {children}
           </div>
 
           {/* Audio Controls Bar */}
-          <div className="relative z-10 border-t border-white/5 bg-black/20 backdrop-blur-sm px-8 py-4">
+          <div className="relative z-30 border-t border-white/10 bg-black/40 backdrop-blur-xl px-8 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <button 
@@ -238,7 +392,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </main>
 
         {/* AI Chat Panel */}
-        {isChatOpen && <AICopilot onClose={() => setIsChatOpen(false)} />}
+        {isChatOpen && (
+          <div className="relative z-30">
+            <AICopilot onClose={() => setIsChatOpen(false)} />
+          </div>
+        )}
       </div>
     </div>
   );
