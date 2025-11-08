@@ -5,6 +5,15 @@
 @tailwind utilities;
 
 @layer base {
+  * {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  
+  *::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+  
   body {
     font-family: 'Inter', sans-serif;
   }
@@ -68,6 +77,16 @@
 }
 
 @layer utilities {
+  /* Hide Scrollbars */
+  .custom-scrollbar {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+  
   .glass-panel {
     background: rgba(15, 23, 42, 0.6);
     backdrop-filter: blur(20px);
@@ -108,14 +127,14 @@
   
   @keyframes pulse-glow {
     0%, 100% {
-      box-shadow: 0 0 20px rgba(6, 182, 212, 0.5),
-                  0 0 40px rgba(6, 182, 212, 0.3),
-                  0 0 60px rgba(6, 182, 212, 0.1);
+      box-shadow: 0 0 20px rgba(81, 103, 107, 0.5),
+                  0 0 40px rgba(60, 75, 77, 0.3),
+                  0 0 60px rgba(141, 155, 157, 0.1);
     }
     50% {
-      box-shadow: 0 0 30px rgba(6, 182, 212, 0.7),
-                  0 0 60px rgba(6, 182, 212, 0.5),
-                  0 0 90px rgba(6, 182, 212, 0.3);
+      box-shadow: 0 0 30px rgba(73, 92, 95, 0.416),
+                  0 0 60px rgba(67, 84, 87, 0.5),
+                  0 0 90px rgba(85, 93, 94, 0.3);
     }
   }
   
@@ -213,9 +232,9 @@
   @keyframes wave {
     0%, 100% {
       transform: scale(1) rotate(0deg);
-      opacity: 0.2;
+      opacity: 2.25
     }
-    50% {
+    25% {
       transform: scale(1.1) rotate(5deg);
       opacity: 0.3;
     }
@@ -227,7 +246,7 @@
       transform: scaleX(0.9);
     }
     50% {
-      opacity: 0.25;
+      opacity: 0.95;
       transform: scaleX(1);
     }
   }

@@ -109,40 +109,40 @@ You are a helpful AI music assistant. Provide concise, actionable advice about m
   };
 
   return (
-    <aside className="relative z-10 flex w-96 flex-col border-l border-white/5 bg-black/20 backdrop-blur-sm">
+    <aside className="flex w-96 flex-col border-l border-white/10 bg-black/50 backdrop-blur-xl h-full relative z-10">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/5 px-6 py-4">
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
-          <h3 className="font-medium text-white text-base">AI Co-Pilot</h3>
+      <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5 flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
+          <h3 className="font-medium text-white text-sm">AI Assistant</h3>
         </div>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-white transition-colors duration-200"
+          className="text-gray-400 hover:text-white transition-colors"
           title="Close"
         >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
         {messages.map((message) => (
           <div
             key={message.id}
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+              className={`max-w-[85%] rounded-lg px-3.5 py-2.5 ${
                 message.role === 'user'
-                  ? 'bg-white/10 text-white border border-white/10'
-                  : 'bg-white/5 text-gray-200 border border-white/5'
+                  ? 'bg-white/10 text-white border border-white/15'
+                  : 'bg-white/5 text-gray-200 border border-white/10'
               }`}
             >
               <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-              <span className="text-xs text-gray-500 mt-2 block">
+              <span className="text-xs text-gray-500 mt-1.5 block">
                 {new Date(message.timestamp).toLocaleTimeString([], {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -154,12 +154,12 @@ You are a helpful AI music assistant. Provide concise, actionable advice about m
         
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-white/5 border border-white/5 rounded-2xl px-4 py-3">
+            <div className="bg-white/5 border border-white/10 rounded-lg px-3.5 py-2.5">
               <div className="flex items-center gap-2">
                 <div className="flex gap-1">
-                  <div className="h-2 w-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="h-2 w-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="h-2 w-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  <div className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }}></div>
                 </div>
                 <span className="text-xs text-gray-500">Thinking...</span>
               </div>
@@ -171,8 +171,8 @@ You are a helpful AI music assistant. Provide concise, actionable advice about m
       </div>
 
       {/* Input */}
-      <div className="border-t border-white/5 p-5">
-        <div className="flex gap-3">
+      <div className="border-t border-white/10 p-4 flex-shrink-0">
+        <div className="flex gap-2">
           <input
             type="text"
             value={input}
@@ -180,24 +180,26 @@ You are a helpful AI music assistant. Provide concise, actionable advice about m
             onKeyPress={handleKeyPress}
             placeholder="Ask me anything..."
             disabled={isLoading}
-            className="flex-1 rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 rounded-lg bg-white/5 border border-white/15 px-3.5 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/25 focus:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="rounded-xl bg-white/10 hover:bg-white/15 px-5 py-3 text-sm font-medium text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white/10"
+            className="rounded-lg bg-white/10 hover:bg-white/15 px-4 py-2.5 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? (
-              <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             ) : (
-              'Send'
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
             )}
           </button>
         </div>
-        <p className="text-xs text-gray-500 mt-2">Press Enter to send, Shift+Enter for new line</p>
+        <p className="text-xs text-gray-500 mt-2">Press Enter to send</p>
       </div>
     </aside>
   );

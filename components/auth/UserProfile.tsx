@@ -23,30 +23,18 @@ export const UserProfile: React.FC = () => {
     <div className="relative">
       <button
         onClick={() => setShowMenu(!showMenu)}
-        className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+        className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center transition-colors"
+        title={user.displayName || user.email || 'User'}
       >
         {user.photoURL ? (
           <img 
             src={user.photoURL} 
             alt={user.displayName || 'User'} 
-            className="w-8 h-8 rounded-full"
+            className="w-full h-full rounded-full object-cover"
           />
         ) : (
-          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-            <User size={20} className="text-white" />
-          </div>
+          <User size={18} className="text-white" />
         )}
-        <span className="text-white text-sm hidden md:block">
-          {user.displayName || user.email}
-        </span>
-        <svg 
-          className={`w-4 h-4 text-gray-400 transition-transform ${showMenu ? 'rotate-180' : ''}`} 
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
       </button>
 
       {showMenu && (
@@ -55,18 +43,18 @@ export const UserProfile: React.FC = () => {
             className="fixed inset-0 z-[100]" 
             onClick={() => setShowMenu(false)}
           />
-          <div className="absolute right-0 mt-2 w-64 bg-gray-800 rounded-lg shadow-2xl z-[101] overflow-hidden border border-gray-700">
-            <div className="p-4 border-b border-gray-700">
-              <p className="text-white font-medium">{user.displayName || 'User'}</p>
-              <p className="text-gray-400 text-sm truncate">{user.email}</p>
+          <div className="absolute right-0 mt-2 w-56 bg-black/40 backdrop-blur-xl rounded-md border border-white/10 z-[101] overflow-hidden">
+            <div className="p-3 border-b border-white/10">
+              <p className="text-white text-sm font-medium">{user.displayName || 'User'}</p>
+              <p className="text-gray-400 text-xs truncate mt-0.5">{user.email}</p>
             </div>
             
             <button
               onClick={handleSignOut}
-              className="w-full px-4 py-3 text-left text-white hover:bg-red-600/20 hover:text-red-400 transition-colors flex items-center gap-2"
+              className="w-full px-3 py-2 text-left text-sm text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-colors flex items-center gap-2"
             >
-              <LogOut size={18} />
-              Sign Out
+              <LogOut size={14} />
+              Sign out
             </button>
           </div>
         </>

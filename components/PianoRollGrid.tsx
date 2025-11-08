@@ -161,13 +161,13 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
       const isBarStart = i % (beatsPerBar * subdivisionsPerBeat) === 0;
       
       if (isBarStart) {
-        ctx.strokeStyle = '#06b6d4';
+        ctx.strokeStyle = '#4b5563';
         ctx.lineWidth = 2;
       } else if (isBeatStart) {
-        ctx.strokeStyle = '#475569';
+        ctx.strokeStyle = '#374151';
         ctx.lineWidth = 1;
       } else {
-        ctx.strokeStyle = '#1e293b';
+        ctx.strokeStyle = '#1f2937';
         ctx.lineWidth = 0.5;
       }
       
@@ -203,7 +203,7 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
       
       // Draw note label for C notes
       if (noteName === 'C') {
-        ctx.fillStyle = '#06b6d4';
+        ctx.fillStyle = '#9ca3af';
         ctx.font = '11px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -408,9 +408,9 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
   };
   
   return (
-    <div className="relative w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col bg-gray-950 relative z-10">
       {/* Toolbar */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-slate-900/60 border-b border-cyan-500/20">
+      <div className="flex items-center gap-3 px-4 py-2.5 bg-black/40 backdrop-blur-xl border-b border-white/10 flex-shrink-0">
         {/* Playback Controls */}
         <PlaybackControls
           isPlaying={isPlaying}
@@ -421,31 +421,31 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
           onModeChange={handleModeChange}
         />
         
-        <div className="h-6 w-px bg-cyan-500/30" />
+        <div className="h-6 w-px bg-white/10" />
         
         <div className="flex items-center gap-2">
           <button
             onClick={() => playNote(60, 0.5, 100)}
-            className="px-3 py-1.5 text-xs rounded-lg bg-cyan-600/60 border border-cyan-500/50 hover:bg-cyan-500/60 hover:border-cyan-400/50 transition-all text-white font-semibold"
+            className="px-3 py-1.5 text-xs rounded-md bg-white/10 border border-white/15 hover:bg-white/15 transition-colors text-white"
             title="Test Audio (Middle C)"
           >
-            🔊 Test
+            Test Audio
           </button>
           <button
             onClick={handleZoomOut}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800/60 border border-cyan-500/30 hover:bg-slate-700/60 hover:border-cyan-400/50 transition-all"
+            className="flex h-8 w-8 items-center justify-center rounded-md bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-white"
             title="Zoom Out"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
             </svg>
           </button>
-          <span className="text-sm text-cyan-300/70 font-mono min-w-[60px] text-center">
+          <span className="text-sm text-gray-400 font-mono min-w-[60px] text-center">
             {Math.round(zoom * 100)}%
           </span>
           <button
             onClick={handleZoomIn}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800/60 border border-cyan-500/30 hover:bg-slate-700/60 hover:border-cyan-400/50 transition-all"
+            className="flex h-8 w-8 items-center justify-center rounded-md bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-white"
             title="Zoom In"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -454,7 +454,7 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
           </button>
           <button
             onClick={handleResetView}
-            className="ml-2 px-3 py-1.5 text-xs rounded-lg bg-slate-800/60 border border-cyan-500/30 hover:bg-slate-700/60 hover:border-cyan-400/50 transition-all text-cyan-300"
+            className="ml-2 px-3 py-1.5 text-xs rounded-md bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-gray-400"
             title="Reset View"
           >
             Reset
@@ -463,7 +463,7 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
         
         <div className="flex-1" />
         
-        <div className="text-xs text-cyan-300/60">
+        <div className="text-xs text-gray-500">
           <span className="font-mono">
             {timeSignature[0]}/{timeSignature[1]} time
           </span>
@@ -554,7 +554,7 @@ export default function PianoRollGrid({ width, height }: PianoRollGridProps) {
       </div>
       
       {/* Instructions */}
-      <div className="absolute bottom-4 right-4 glass-panel rounded-lg px-3 py-2 text-xs text-cyan-300/60 space-y-1">
+      <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-xl border border-white/10 rounded-md px-3 py-2 text-xs text-gray-500 space-y-1">
         <div>Click: Add Note • Right-Click: Delete • Drag Edge: Resize</div>
         <div>Space: Play/Pause • Drag Playhead: Seek • Drag Loop: Adjust Range</div>
         <div>Scroll: Pan • Ctrl+Scroll: Zoom</div>

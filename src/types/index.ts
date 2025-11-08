@@ -58,6 +58,8 @@ export interface SessionContext {
   // Metadata
   projectName?: string;
   tags?: string[];
+  songTitle?: string;
+  artist?: string;
 }
 
 // API Request/Response Types
