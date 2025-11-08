@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import PianoRollGrid from './PianoRollGrid';
 import ShaderBackground from './shader-background';
 import AICopilot from './AICopilot';
+import Mixer from './Mixer';
 import { useAudioEngine } from '@/src/hooks/useAudioEngine';
 import { useStore } from '@/src/store';
 
@@ -174,32 +175,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
             )}
 
             {activePanel === 'mixer' && (
-              <div className="flex h-full items-center justify-center p-4">
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 w-full max-w-4xl">
-                  <h2 className="text-3xl font-bold text-white/90 mb-6">Mixer</h2>
-                  
-                  {/* Waveform Visualizer */}
-                  <div className="relative h-48 rounded-xl bg-black/30 border border-white/5 p-6 mb-6 overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-t from-cyan-500/10 to-transparent"></div>
-                    <div className="relative flex items-end justify-center gap-1 h-full">
-                      {[...Array(40)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="waveform-bar w-2 bg-gradient-to-t from-cyan-500 to-cyan-300 rounded-t-full opacity-70"
-                          style={{
-                            animationDelay: `${i * 0.05}s`,
-                            height: `${Math.random() * 60 + 20}%`
-                          }}
-                        ></div>
-                      ))}
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <p className="text-gray-500 text-sm">Audio Waveform Visualizer</p>
-                    </div>
-                  </div>
-                  
-                  <p className="text-gray-400 text-center">Mixer controls will appear here</p>
-                </div>
+              <div className="h-full">
+                <Mixer />
               </div>
             )}
 
