@@ -1,25 +1,31 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useRouter } from 'next/navigation';
 import MainLayout from '@/components/MainLayout';
-import LoginPage from '@/components/LoginPage';
 
 export default function Home() {
   const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900">
-        <div className="text-cyan-400 text-xl">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-950">
+        <div className="text-white text-xl">Loading...</div>
       </div>
     );
   }
 
-  // Show login page if not authenticated
   if (!user) {
-    return <LoginPage />;
+    return null;
   }
 
-  // Show main app if authenticated
   return <MainLayout />;
 }

@@ -1,74 +1,43 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth } from '@/lib/firebase/config';
-import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
-
-interface User {
-  uid: string;
-  name: string;
-  email: string;
-  avatar?: string;
-}
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { User, onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../firebase/config';
 
 interface AuthContextType {
   user: User | null;
-  firebaseUser: FirebaseUser | null;
   loading: boolean;
-  logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+});
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setFirebaseUser(firebaseUser);
-        
-        const userData: User = {
-          uid: firebaseUser.uid,
-          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-          email: firebaseUser.email || '',
-          avatar: firebaseUser.photoURL || undefined
-        };
-        
-        setUser(userData);
-      } else {
-        setFirebaseUser(null);
-        setUser(null);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const logout = async () => {
-    try {
-      await signOut(auth);
-      setUser(null);
-      setFirebaseUser(null);
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, firebaseUser, loading, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ user, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
