@@ -131,4 +131,197 @@
   .waveform-bar {
     animation: waveform 1.5s ease-in-out infinite;
   }
+  
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px) rotate(0deg);
+      opacity: 0.15;
+    }
+    50% {
+      transform: translateY(-30px) rotate(5deg);
+      opacity: 0.2;
+    }
+  }
+  
+  @keyframes float-slow {
+    0%, 100% {
+      transform: translateY(0px) rotate(0deg) scale(1);
+      opacity: 0.12;
+    }
+    50% {
+      transform: translateY(-50px) rotate(-5deg) scale(1.05);
+      opacity: 0.18;
+    }
+  }
+  
+  @keyframes pulse-slow {
+    0%, 100% {
+      opacity: 0.15;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.2;
+      transform: scale(1.05);
+    }
+  }
+  
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  
+  .animate-float-slow {
+    animation: float-slow 10s ease-in-out infinite;
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse-slow 4s ease-in-out infinite;
+  }
+  
+  @keyframes float-reverse {
+    0%, 100% {
+      transform: translateY(0px) rotate(0deg);
+      opacity: 0.18;
+    }
+    50% {
+      transform: translateY(30px) rotate(-5deg);
+      opacity: 0.25;
+    }
+  }
+  
+  @keyframes float-rotate {
+    0%, 100% {
+      transform: translateY(0px) rotate(0deg) scale(1);
+      opacity: 0.15;
+    }
+    50% {
+      transform: translateY(-40px) rotate(180deg) scale(1.1);
+      opacity: 0.22;
+    }
+  }
+  
+  @keyframes float-rotate-reverse {
+    0%, 100% {
+      transform: translateY(0px) rotate(0deg) scale(1);
+      opacity: 0.15;
+    }
+    50% {
+      transform: translateY(-40px) rotate(-180deg) scale(1.1);
+      opacity: 0.22;
+    }
+  }
+  
+  @keyframes wave {
+    0%, 100% {
+      transform: scale(1) rotate(0deg);
+      opacity: 0.2;
+    }
+    50% {
+      transform: scale(1.1) rotate(5deg);
+      opacity: 0.3;
+    }
+  }
+  
+  @keyframes staff-line {
+    0%, 100% {
+      opacity: 0.15;
+      transform: scaleX(0.9);
+    }
+    50% {
+      opacity: 0.25;
+      transform: scaleX(1);
+    }
+  }
+  
+  @keyframes spin-slow {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  @keyframes equalizer {
+    0%, 100% {
+      height: 30%;
+      opacity: 0.2;
+    }
+    50% {
+      height: 80%;
+      opacity: 0.3;
+    }
+  }
+  
+  @keyframes piano-key {
+    0%, 100% {
+      opacity: 0.15;
+      transform: scaleY(1);
+    }
+    50% {
+      opacity: 0.25;
+      transform: scaleY(1.2);
+    }
+  }
+  
+  @keyframes glow-pulse {
+    0%, 100% {
+      opacity: 0.15;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.25;
+      transform: scale(1.2);
+    }
+  }
+  
+  @keyframes sparkle {
+    0%, 100% {
+      opacity: 0.2;
+      transform: scale(0.8);
+    }
+    50% {
+      opacity: 0.4;
+      transform: scale(1.2);
+    }
+  }
+  
+  .animate-float-reverse {
+    animation: float-reverse 7s ease-in-out infinite;
+  }
+  
+  .animate-float-rotate {
+    animation: float-rotate 12s ease-in-out infinite;
+  }
+  
+  .animate-float-rotate-reverse {
+    animation: float-rotate-reverse 12s ease-in-out infinite;
+  }
+  
+  .animate-wave {
+    animation: wave 3s ease-in-out infinite;
+  }
+  
+  .animate-staff-line {
+    animation: staff-line 4s ease-in-out infinite;
+  }
+  
+  .animate-spin-slow {
+    animation: spin-slow 20s linear infinite;
+  }
+  
+  .animate-equalizer {
+    animation: equalizer 0.8s ease-in-out infinite;
+  }
+  
+  .animate-piano-key {
+    animation: piano-key 3s ease-in-out infinite;
+  }
+  
+  .animate-glow-pulse {
+    animation: glow-pulse 6s ease-in-out infinite;
+  }
+  
+  .animate-sparkle {
+    animation: sparkle 2s ease-in-out infinite;
+  }
 }
