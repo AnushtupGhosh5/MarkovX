@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import PianoRollGrid from './PianoRollGrid';
 import ShaderBackground from './shader-background';
+import AICopilot from './AICopilot';
 import { useAudioEngine } from '@/src/hooks/useAudioEngine';
 import { useStore } from '@/src/store';
 
@@ -29,8 +30,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
       audioEngine.pause();
       setIsPlaying(false);
     } else {
-      // Schedule all notes
-      audioEngine.scheduleNotes(session.notes, session.tempo);
+      // Set tempo
+      audioEngine.setTempo(session.tempo);
+      
+      // Schedule all notes (no loop by default)
+      audioEngine.scheduleNotes(session.notes, 0, 16, false);
       audioEngine.play();
       setIsPlaying(true);
     }
@@ -259,63 +263,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </main>
 
         {/* AI Chat Panel */}
-        {isChatOpen && (
-          <aside className="relative z-10 flex w-96 flex-col border-l border-white/5 bg-black/20 backdrop-blur-sm">
-            <div className="flex items-center justify-between border-b border-white/5 px-6 py-4">
-              <div className="flex items-center gap-2">
-                <h3 className="font-medium text-white text-base">AI Co-Pilot</h3>
-              </div>
-              <button
-                onClick={() => setIsChatOpen(false)}
-                className="text-gray-400 hover:text-white transition-colors duration-200"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-auto p-6">
-              <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-                <div className="text-sm space-y-3">
-                  <p className="text-white/90">Welcome to MusePilot! I&apos;m your AI music assistant.</p>
-                  <p className="text-gray-400">Try asking me to:</p>
-                  <ul className="space-y-2 text-gray-300">
-                    <li className="flex items-start gap-2">
-                      <span className="text-gray-500 mt-0.5">•</span>
-                      <span>Generate music from a prompt</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-gray-500 mt-0.5">•</span>
-                      <span>Transpose notes</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-gray-500 mt-0.5">•</span>
-                      <span>Change tempo or key</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-gray-500 mt-0.5">•</span>
-                      <span>Generate lyrics</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-white/5 p-5">
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  placeholder="Ask me anything..."
-                  className="flex-1 rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition-colors"
-                />
-                <button className="rounded-xl bg-white/10 hover:bg-white/15 px-5 py-3 text-sm font-medium text-white transition-colors duration-200">
-                  Send
-                </button>
-              </div>
-            </div>
-          </aside>
-        )}
+        {isChatOpen && <AICopilot onClose={() => setIsChatOpen(false)} />}
       </div>
     </div>
   );
