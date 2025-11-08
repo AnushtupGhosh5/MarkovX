@@ -46,16 +46,18 @@ async def load_model():
     """Load MusicGen model on startup"""
     global model, processor
     try:
-        logger.info("Loading MusicGen model...")
+        logger.info("Loading MusicGen model on CPU...")
+        
         model = MusicgenForConditionalGeneration.from_pretrained(
             "facebook/musicgen-small",
             trust_remote_code=True
         )
+        
         processor = AutoProcessor.from_pretrained(
             "facebook/musicgen-small",
             trust_remote_code=True
         )
-        logger.info("✓ MusicGen model loaded successfully!")
+        logger.info("✓ MusicGen model loaded successfully on CPU!")
     except Exception as e:
         logger.error(f"Failed to load model: {e}")
         logger.exception(e)
