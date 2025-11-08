@@ -35,3 +35,6 @@ next-env.d.ts
 .kiro/specs/musepilot/specs/design.md
 .kiro/specs/musepilot/specs/tasks.md
 .kiro
+frontend
+*.pyc
+venv
