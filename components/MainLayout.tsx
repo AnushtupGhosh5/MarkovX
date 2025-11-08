@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import PianoRollGrid from './PianoRollGrid';
 import ShaderBackground from './shader-background';
 import TextToMusicPanel from './TextToMusicPanel';
 import AICopilot from './AICopilot';
+import ExportImportMenu from './ExportImportMenu';
 import { useAudioEngine } from '@/src/hooks/useAudioEngine';
 import { useStore } from '@/src/store';
 
@@ -57,6 +58,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </div>
         
         <div className="flex items-center gap-3">
+          <ExportImportMenu onClose={() => {}} />
           <button className="rounded-lg bg-white text-black px-5 py-2 text-sm font-medium hover:bg-gray-100 transition-colors duration-200">
             Export MP3
           </button>

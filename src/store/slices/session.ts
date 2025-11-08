@@ -7,6 +7,7 @@ export interface SessionSlice {
   
   // Actions
   updateSession: (updates: Partial<SessionContext>) => void;
+  loadSession: (session: SessionContext) => void;
   addNotes: (notes: Note[]) => void;
   updateNotes: (notes: Note[]) => void;
   deleteNotes: (noteIds: string[]) => void;
@@ -41,6 +42,14 @@ export const createSessionSlice: StateCreator<SessionSlice> = (set) => ({
       session: {
         ...state.session,
         ...updates,
+        updatedAt: Date.now(),
+      },
+    })),
+  
+  loadSession: (session) =>
+    set(() => ({
+      session: {
+        ...session,
         updatedAt: Date.now(),
       },
     })),
