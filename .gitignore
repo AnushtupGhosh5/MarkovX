@@ -39,3 +39,7 @@ frontend
 *.pyc
 venv
 venv310
+
+
+# generated audio files
+/public/audio
