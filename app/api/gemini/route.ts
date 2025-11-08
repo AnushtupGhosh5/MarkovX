@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     // Validate prompt
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json(
-        { error: 'Prompt is required and must be a string' },
+        { success: false, error: 'Prompt is required and must be a string' },
         { status: 400 }
       );
     }
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     if (!apiKey) {
       console.error('GEMINI_API_KEY is not set');
       return NextResponse.json(
-        { error: 'Gemini API is not configured' },
+        { success: false, error: 'Gemini API is not configured' },
         { status: 500 }
       );
     }
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     // Return successful response
     return NextResponse.json(
-      { response: text },
+      { success: true, text, response: text },
       { status: 200 }
     );
 
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       // Check for API key errors
       if (error.message.includes('API key')) {
         return NextResponse.json(
-          { error: 'Invalid API key' },
+          { success: false, error: 'Invalid API key' },
           { status: 401 }
         );
       }
@@ -67,21 +67,21 @@ export async function POST(request: NextRequest) {
       // Check for rate limit errors
       if (error.message.includes('quota') || error.message.includes('rate limit')) {
         return NextResponse.json(
-          { error: 'API rate limit exceeded' },
+          { success: false, error: 'API rate limit exceeded' },
           { status: 429 }
         );
       }
 
       // Return generic error with message
       return NextResponse.json(
-        { error: `Gemini API error: ${error.message}` },
+        { success: false, error: `Gemini API error: ${error.message}` },
         { status: 500 }
       );
     }
 
     // Handle unknown errors
     return NextResponse.json(
-      { error: 'An unexpected error occurred' },
+      { success: false, error: 'An unexpected error occurred' },
       { status: 500 }
     );
   }

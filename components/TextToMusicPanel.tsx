@@ -42,37 +42,70 @@ export default function TextToMusicPanel() {
     setCurrentAudio(null);
 
     try {
-      const response = await fetch('/api/gen/text', {
+      // First, try the generate-music API
+      const response = await fetch('/api/generate-music', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           prompt: prompt.trim(),
-          durationSec: duration,
-          tempo: session.tempo,
-          key: session.keySignature,
-          sessionContext: {
-            tempo: session.tempo,
-            key: session.keySignature,
-          },
+          duration: duration,
+          temperature: 0.8,
         }),
       });
 
       const data = await response.json();
 
       if (!data.success) {
-        if (data.error === 'timeout') {
-          setError('Generation timed out. The model might be busy. Please try again.');
-        } else if (response.status === 503) {
-          setError('Model is loading. Please wait a moment and try again.');
-        } else {
-          setError(data.error || 'Failed to generate music');
+        // If the main API fails, try the text generation API as fallback
+        const fallbackResponse = await fetch('/api/gen/text', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: prompt.trim(),
+            durationSec: duration,
+            tempo: session.tempo,
+            key: session.keySignature,
+            sessionContext: {
+              tempo: session.tempo,
+              key: session.keySignature,
+            },
+          }),
+        });
+
+        const fallbackData = await fallbackResponse.json();
+
+        if (!fallbackData.success) {
+          if (fallbackData.error === 'timeout') {
+            setError('Generation timed out. The model might be busy. Please try again.');
+          } else if (fallbackResponse.status === 503) {
+            setError('Music generation service is not available. Please check that the MusicGen server is running or configure the HUGGINGFACE_API_KEY.');
+          } else {
+            setError(fallbackData.error || 'Failed to generate music. Please ensure the music generation service is configured.');
+          }
+          return;
         }
+
+        // Success with fallback!
+        setCurrentAudio(fallbackData.audioUrl);
+        
+        const newAudio: GeneratedAudio = {
+          id: crypto.randomUUID(),
+          url: fallbackData.audioUrl,
+          prompt: prompt.trim(),
+          timestamp: Date.now(),
+        };
+        
+        updateSession({
+          generatedAudio: [...session.generatedAudio, newAudio],
+        });
         return;
       }
 
-      // Success!
+      // Success with main API!
       setCurrentAudio(data.audioUrl);
       
       // Update session context
@@ -101,16 +134,16 @@ export default function TextToMusicPanel() {
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="mb-6">
-        <h2 className="text-3xl font-bold text-white/90 mb-2">Text to Music</h2>
-        <p className="text-gray-400">Generate music from a text description</p>
+    <div className="h-full flex flex-col max-w-3xl mx-auto relative z-10">
+      <div className="mb-8">
+        <h2 className="text-2xl font-semibold text-white mb-1">Text to Music</h2>
+        <p className="text-sm text-gray-400">Generate music from a text description</p>
       </div>
 
       {/* Sample Prompts */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-300 mb-3">
-          Try a sample prompt:
+        <label className="block text-xs font-medium text-gray-400 mb-3 uppercase tracking-wide">
+          Quick Start
         </label>
         <div className="grid grid-cols-3 gap-3">
           {SAMPLE_PROMPTS.map((sample) => (
@@ -118,10 +151,10 @@ export default function TextToMusicPanel() {
               key={sample.title}
               onClick={() => handleUseSample(sample.prompt)}
               disabled={isGenerating}
-              className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-left transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-md text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <div className="font-medium text-white/90 mb-1">{sample.title}</div>
-              <div className="text-xs text-gray-400 line-clamp-2">{sample.prompt}</div>
+              <div className="text-sm font-medium text-white mb-1">{sample.title}</div>
+              <div className="text-xs text-gray-500 line-clamp-2">{sample.prompt}</div>
             </button>
           ))}
         </div>
@@ -129,8 +162,8 @@ export default function TextToMusicPanel() {
 
       {/* Prompt Input */}
       <div className="mb-4">
-        <label htmlFor="prompt" className="block text-sm font-medium text-gray-300 mb-2">
-          Describe the music you want to create:
+        <label htmlFor="prompt" className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wide">
+          Description
         </label>
         <textarea
           id="prompt"
@@ -140,20 +173,23 @@ export default function TextToMusicPanel() {
             setError(null);
           }}
           disabled={isGenerating}
-          placeholder="e.g., a relaxing ambient soundscape with soft pads and gentle melodies"
-          className="w-full h-24 rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition-colors resize-none disabled:opacity-50"
+          placeholder="Describe the music you want to create..."
+          className="w-full h-24 rounded-md bg-white/5 border border-white/10 px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-white/25 transition-colors resize-none disabled:opacity-50 custom-scrollbar"
           maxLength={500}
         />
-        <div className="mt-1 text-xs text-gray-500 text-right">
-          {prompt.length}/500 characters
+        <div className="mt-1.5 text-xs text-gray-600 text-right">
+          {prompt.length}/500
         </div>
       </div>
 
       {/* Duration Control */}
       <div className="mb-6">
-        <label htmlFor="duration" className="block text-sm font-medium text-gray-300 mb-2">
-          Duration: {duration} seconds
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="duration" className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+            Duration
+          </label>
+          <span className="text-xs text-gray-500">{duration}s</span>
+        </div>
         <input
           id="duration"
           type="range"
@@ -163,19 +199,15 @@ export default function TextToMusicPanel() {
           value={duration}
           onChange={(e) => setDuration(parseInt(e.target.value))}
           disabled={isGenerating}
-          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer disabled:opacity-50"
+          className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer disabled:opacity-50"
         />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>5s</span>
-          <span>20s</span>
-        </div>
       </div>
 
       {/* Generate Button */}
       <button
         onClick={handleGenerate}
         disabled={isGenerating || !prompt.trim() || prompt.length < 10}
-        className="w-full py-4 bg-white text-black rounded-xl font-medium hover:bg-gray-100 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full py-2.5 bg-white text-black hover:bg-gray-200 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
       >
         {isGenerating ? (
           <>
@@ -197,7 +229,7 @@ export default function TextToMusicPanel() {
 
       {/* Error Display */}
       {error && (
-        <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+        <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md">
           <div className="flex items-start gap-2">
             <svg className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -212,7 +244,7 @@ export default function TextToMusicPanel() {
 
       {/* Audio Player */}
       {currentAudio && (
-        <div className="mt-6 p-6 bg-white/5 border border-white/10 rounded-xl">
+        <div className="mt-6 p-4 bg-green-500/10 border border-green-500/20 rounded-md">
           <div className="flex items-center gap-3 mb-4">
             <svg className="h-6 w-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />

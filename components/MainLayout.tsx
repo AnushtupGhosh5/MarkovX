@@ -7,8 +7,13 @@ import TextToMusicPanel from './TextToMusicPanel';
 import MelodyToMusicPanel from './MelodyToMusicPanel';
 import HummingToMusicPanel from './HummingToMusicPanel';
 import AICopilot from './AICopilot';
+import Mixer from './Mixer';
+import LyricsEditor from './LyricsEditor';
 import { useAudioEngine } from '@/src/hooks/useAudioEngine';
 import { useStore } from '@/src/store';
+import { UserProfile } from '@/components/auth';
+import { authService } from '@/lib/auth/authService';
+import { LogOut } from 'lucide-react';
 
 type PanelView = 'pianoRoll' | 'lyrics' | 'mixer' | 'textToMusic' | 'melodyToMusic' | 'hummingToMusic';
 
@@ -48,35 +53,111 @@ export default function MainLayout({ children }: MainLayoutProps) {
     setIsPlaying(false);
   };
 
+  const handleSignOut = async () => {
+    try {
+      await authService.signOut();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
+  const handleExport = () => {
+    // Export session as JSON
+    const sessionData = {
+      ...session,
+      exportedAt: new Date().toISOString(),
+    };
+    
+    const dataStr = JSON.stringify(sessionData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `musepilot-session-${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleNewSession = () => {
+    if (session.notes.length > 0 || session.generatedAudio.length > 0 || session.lyrics?.text) {
+      const confirmed = window.confirm('Start a new session? All unsaved changes will be lost.');
+      if (!confirmed) return;
+    }
+    
+    // Clear session
+    useStore.setState((state) => ({
+      session: {
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        tempo: 120,
+        keySignature: 'C',
+        timeSignature: [4, 4] as [number, number],
+        notes: [],
+        generatedAudio: [],
+        lyrics: {
+          text: '',
+          segments: [],
+        },
+        conversationHistory: [],
+      },
+      selectedNotes: [],
+    }));
+    
+    // Stop playback
+    audioEngine.stop();
+    setIsPlaying(false);
+    
+    // Reset to home
+    setActivePanel(null);
+  };
+
   return (
     <div className="flex h-screen flex-col text-white relative">
       <ShaderBackground />
       {/* Header */}
-      <header className="relative z-10 flex items-center justify-between border-b border-white/5 bg-black/20 backdrop-blur-sm px-6 py-4">
+      <header className="relative z-30 flex items-center justify-between border-b border-white/10 bg-black/40 backdrop-blur-xl px-6 py-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold text-white">MusePilot</h1>
-          <span className="text-sm text-gray-400">AI Music Production</span>
+          <h1 className="text-xl font-semibold text-white">MusePilot</h1>
         </div>
         
-        <div className="flex items-center gap-3">
-          <button className="rounded-lg bg-white text-black px-5 py-2 text-sm font-medium hover:bg-gray-100 transition-colors duration-200">
-            Export MP3
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleExport}
+            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center transition-colors"
+            title="Export Session"
+          >
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
           </button>
-          <button className="rounded-lg bg-white/10 hover:bg-white/15 text-white px-5 py-2 text-sm font-medium border border-white/10 transition-colors duration-200">
-            New Session
+          
+          <button 
+            onClick={handleNewSession}
+            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center transition-colors"
+            title="New Session"
+          >
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
           </button>
+          
+          <UserProfile />
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="relative z-10 flex w-16 flex-col items-center gap-2 border-r border-white/5 bg-black/20 backdrop-blur-sm py-6">
+        <aside className="relative z-30 flex w-16 flex-col items-center gap-2 border-r border-white/10 bg-black/40 backdrop-blur-xl py-6">
           <button
             onClick={() => setActivePanel('pianoRoll')}
-            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
               activePanel === 'pianoRoll'
-                ? 'bg-white/10 text-white'
-                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                ? 'bg-white/15 text-white border border-white/20'
+                : 'text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
             title="Piano Roll"
           >
@@ -87,10 +168,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           <button
             onClick={() => setActivePanel('lyrics')}
-            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
               activePanel === 'lyrics'
-                ? 'bg-white/10 text-white'
-                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                ? 'bg-white/15 text-white border border-white/20'
+                : 'text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
             title="Lyrics"
           >
@@ -101,10 +182,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           <button
             onClick={() => setActivePanel('mixer')}
-            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
               activePanel === 'mixer'
-                ? 'bg-white/10 text-white'
-                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                ? 'bg-white/15 text-white border border-white/20'
+                : 'text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
             title="Mixer"
           >
@@ -115,10 +196,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           <button
             onClick={() => setActivePanel('textToMusic')}
-            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
               activePanel === 'textToMusic'
-                ? 'bg-white/10 text-white'
-                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                ? 'bg-white/15 text-white border border-white/20'
+                : 'text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
             title="Text to Music"
           >
@@ -159,10 +240,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
               isChatOpen
-                ? 'bg-white/10 text-white'
-                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                ? 'bg-white/15 text-white border border-white/20'
+                : 'text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
             title="AI Co-Pilot"
           >
@@ -173,9 +254,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </aside>
 
         {/* Main Workspace */}
-        <main className="relative flex flex-1 flex-col overflow-hidden">
+        <main className="relative z-10 flex flex-1 flex-col overflow-hidden bg-gray-950/50">
           {/* Panel Content Area */}
-          <div className="flex-1 overflow-auto p-8">
+          <div className="flex-1 overflow-auto p-8 relative z-10">
             {!activePanel && (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center space-y-6 max-w-2xl">
@@ -188,21 +269,21 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   <div className="flex items-center justify-center gap-4 pt-8">
                     <button
                       onClick={() => setActivePanel('textToMusic')}
-                      className="px-6 py-3 bg-white text-black hover:bg-gray-100 rounded-xl font-medium transition-all duration-200"
+                      className="px-6 py-3 bg-white text-black hover:bg-gray-100 rounded-lg font-medium transition-colors"
                     >
                       Generate Music
                     </button>
                     <button
                       onClick={() => setActivePanel('pianoRoll')}
-                      className="px-6 py-3 bg-white/10 hover:bg-white/15 text-white rounded-xl border border-white/10 transition-all duration-200"
+                      className="px-6 py-3 bg-white/10 hover:bg-white/15 text-white rounded-lg border border-white/15 transition-colors font-medium"
                     >
-                      Open Piano Roll
+                      Piano Roll
                     </button>
                     <button
                       onClick={() => setActivePanel('mixer')}
-                      className="px-6 py-3 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl border border-white/5 transition-all duration-200"
+                      className="px-6 py-3 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg border border-white/10 transition-colors"
                     >
-                      Open Mixer
+                      Mixer
                     </button>
                   </div>
                 </div>
@@ -210,47 +291,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
             )}
 
             {activePanel === 'pianoRoll' && (
-              <div className="h-full">
+              <div className="absolute inset-0">
                 <PianoRollGrid />
               </div>
             )}
 
             {activePanel === 'lyrics' && (
-              <div className="flex h-full items-center justify-center">
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-12 text-center">
-                  <h2 className="text-3xl font-bold text-white/90">Lyrics Editor</h2>
-                  <p className="mt-3 text-gray-400">Lyrics editor will appear here</p>
-                </div>
+              <div className="h-full">
+                <LyricsEditor />
               </div>
             )}
 
             {activePanel === 'mixer' && (
-              <div className="flex h-full items-center justify-center p-4">
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 w-full max-w-4xl">
-                  <h2 className="text-3xl font-bold text-white/90 mb-6">Mixer</h2>
-                  
-                  {/* Waveform Visualizer */}
-                  <div className="relative h-48 rounded-xl bg-black/30 border border-white/5 p-6 mb-6 overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-t from-cyan-500/10 to-transparent"></div>
-                    <div className="relative flex items-end justify-center gap-1 h-full">
-                      {[...Array(40)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="waveform-bar w-2 bg-gradient-to-t from-cyan-500 to-cyan-300 rounded-t-full opacity-70"
-                          style={{
-                            animationDelay: `${i * 0.05}s`,
-                            height: `${Math.random() * 60 + 20}%`
-                          }}
-                        ></div>
-                      ))}
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <p className="text-gray-500 text-sm">Audio Waveform Visualizer</p>
-                    </div>
-                  </div>
-                  
-                  <p className="text-gray-400 text-center">Mixer controls will appear here</p>
-                </div>
+              <div className="h-full">
+                <Mixer />
               </div>
             )}
 
@@ -282,7 +336,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
 
           {/* Audio Controls Bar */}
-          <div className="relative z-10 border-t border-white/5 bg-black/20 backdrop-blur-sm px-8 py-4">
+          <div className="relative z-30 border-t border-white/10 bg-black/40 backdrop-blur-xl px-8 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <button 
@@ -338,7 +392,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </main>
 
         {/* AI Chat Panel */}
-        {isChatOpen && <AICopilot onClose={() => setIsChatOpen(false)} />}
+        {isChatOpen && (
+          <div className="relative z-30">
+            <AICopilot onClose={() => setIsChatOpen(false)} />
+          </div>
+        )}
       </div>
     </div>
   );
