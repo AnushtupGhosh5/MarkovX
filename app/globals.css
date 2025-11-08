@@ -210,6 +210,7 @@
 
   select {
     color-scheme: dark;
+  }
   
   @keyframes float {
     0%, 100% {
