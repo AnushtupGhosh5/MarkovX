@@ -16,7 +16,16 @@ interface Track {
   audioUrl?: string;
 }
 
+interface AudioChannel {
+  synth: Tone.PolySynth;
+  volume: Tone.Volume;
+  panner: Tone.Panner;
+  channel: Tone.Channel;
+}
+
 export default function Mixer() {
+  // Audio channels for each track
+  const audioChannelsRef = useRef<Map<string, AudioChannel>>(new Map());
   const [tracks, setTracks] = useState<Track[]>([
     {
       id: '1',
@@ -57,8 +66,104 @@ export default function Mixer() {
   const [waveformData, setWaveformData] = useState<number[]>(Array(64).fill(0));
   const animationRef = useRef<number>();
   const analyserRef = useRef<Tone.Analyser | null>(null);
+  const masterVolumeRef = useRef<Tone.Volume | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const { session } = useStore((state) => ({ session: state.session }));
+
+  // Initialize audio engine
+  useEffect(() => {
+    const initAudio = async () => {
+      try {
+        await Tone.start();
+        console.log('✅ Audio engine started');
+
+        // Create master volume control
+        if (!masterVolumeRef.current) {
+          masterVolumeRef.current = new Tone.Volume(masterVolume).toDestination();
+        }
+
+        // Create analyzer
+        if (!analyserRef.current) {
+          analyserRef.current = new Tone.Analyser('waveform', 64);
+          masterVolumeRef.current.connect(analyserRef.current);
+        }
+
+        // Initialize channels for existing tracks
+        tracks.forEach(track => {
+          if (!audioChannelsRef.current.has(track.id)) {
+            createAudioChannel(track);
+          }
+        });
+
+        setIsInitialized(true);
+        console.log('✅ Mixer initialized with', tracks.length, 'tracks');
+      } catch (error) {
+        console.error('❌ Failed to initialize audio:', error);
+      }
+    };
+
+    initAudio();
+
+    return () => {
+      // Cleanup on unmount
+      audioChannelsRef.current.forEach(channel => {
+        channel.synth.dispose();
+        channel.volume.dispose();
+        channel.panner.dispose();
+        channel.channel.dispose();
+      });
+      audioChannelsRef.current.clear();
+    };
+  }, []);
+
+  // Create audio channel for a track
+  const createAudioChannel = (track: Track): AudioChannel => {
+    console.log(`🎵 Creating audio channel for ${track.name}`);
+
+    // Create synth
+    const synth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle' },
+      envelope: {
+        attack: 0.01,
+        decay: 0.1,
+        sustain: 0.3,
+        release: 0.5,
+      },
+    });
+
+    // Create volume control
+    const volume = new Tone.Volume(track.volume);
+
+    // Create panner
+    const panner = new Tone.Panner(track.pan);
+
+    // Create channel (combines volume and pan)
+    const channel = new Tone.Channel({
+      volume: track.volume,
+      pan: track.pan,
+      mute: track.muted,
+    });
+
+    // Connect: synth -> volume -> panner -> channel -> master
+    synth.connect(volume);
+    volume.connect(panner);
+    panner.connect(channel);
+    
+    if (masterVolumeRef.current) {
+      channel.connect(masterVolumeRef.current);
+    }
+
+    const audioChannel: AudioChannel = {
+      synth,
+      volume,
+      panner,
+      channel,
+    };
+
+    audioChannelsRef.current.set(track.id, audioChannel);
+    return audioChannel;
+  };
 
   // Initialize audio analyzer
   useEffect(() => {
@@ -101,6 +206,14 @@ export default function Mixer() {
         track.id === trackId ? { ...track, volume } : track
       )
     );
+
+    // Apply to audio channel
+    const channel = audioChannelsRef.current.get(trackId);
+    if (channel) {
+      channel.volume.volume.value = volume;
+      channel.channel.volume.value = volume;
+      console.log(`🔊 Track ${trackId} volume set to ${volume} dB`);
+    }
   };
 
   const handlePanChange = (trackId: string, pan: number) => {
@@ -109,22 +222,61 @@ export default function Mixer() {
         track.id === trackId ? { ...track, pan } : track
       )
     );
+
+    // Apply to audio channel
+    const channel = audioChannelsRef.current.get(trackId);
+    if (channel) {
+      channel.panner.pan.value = pan;
+      channel.channel.pan.value = pan;
+      console.log(`🎚️ Track ${trackId} pan set to ${pan}`);
+    }
   };
 
   const toggleMute = (trackId: string) => {
     setTracks((prev) =>
-      prev.map((track) =>
-        track.id === trackId ? { ...track, muted: !track.muted } : track
-      )
+      prev.map((track) => {
+        if (track.id === trackId) {
+          const newMuted = !track.muted;
+          
+          // Apply to audio channel
+          const channel = audioChannelsRef.current.get(trackId);
+          if (channel) {
+            channel.channel.mute = newMuted;
+            console.log(`🔇 Track ${trackId} mute: ${newMuted}`);
+          }
+          
+          return { ...track, muted: newMuted };
+        }
+        return track;
+      })
     );
   };
 
   const toggleSolo = (trackId: string) => {
-    setTracks((prev) =>
-      prev.map((track) =>
+    setTracks((prev) => {
+      const newTracks = prev.map((track) =>
         track.id === trackId ? { ...track, solo: !track.solo } : track
-      )
-    );
+      );
+
+      // Handle solo logic: mute all non-solo tracks if any track is soloed
+      const hasSolo = newTracks.some(t => t.solo);
+      
+      newTracks.forEach(track => {
+        const channel = audioChannelsRef.current.get(track.id);
+        if (channel) {
+          if (hasSolo) {
+            // If there are solo tracks, mute non-solo tracks
+            channel.channel.mute = !track.solo;
+          } else {
+            // If no solo tracks, respect individual mute settings
+            channel.channel.mute = track.muted;
+          }
+        }
+      });
+
+      console.log(`🎵 Solo toggled for track ${trackId}`);
+      return newTracks;
+    });
   };
 
   const addTrack = () => {
@@ -139,14 +291,95 @@ export default function Mixer() {
       type: 'midi',
     };
     setTracks((prev) => [...prev, newTrack]);
+    
+    // Create audio channel for new track
+    if (isInitialized) {
+      createAudioChannel(newTrack);
+      console.log(`✅ Added track: ${newTrack.name}`);
+    }
   };
 
   const deleteTrack = (trackId: string) => {
+    // Dispose audio channel
+    const channel = audioChannelsRef.current.get(trackId);
+    if (channel) {
+      channel.synth.dispose();
+      channel.volume.dispose();
+      channel.panner.dispose();
+      channel.channel.dispose();
+      audioChannelsRef.current.delete(trackId);
+      console.log(`🗑️ Deleted track: ${trackId}`);
+    }
+
     setTracks((prev) => prev.filter((track) => track.id !== trackId));
     if (selectedTrack === trackId) {
       setSelectedTrack(tracks[0]?.id || null);
     }
   };
+
+  // Update master volume
+  useEffect(() => {
+    if (masterVolumeRef.current) {
+      masterVolumeRef.current.volume.value = masterMuted ? -Infinity : masterVolume;
+      console.log(`🎛️ Master volume: ${masterMuted ? 'MUTED' : `${masterVolume} dB`}`);
+    }
+  }, [masterVolume, masterMuted]);
+
+  // Play a test note on a track (for testing)
+  const playTestNote = (trackId: string) => {
+    const channel = audioChannelsRef.current.get(trackId);
+    if (channel) {
+      const note = 'C4';
+      const duration = '8n';
+      channel.synth.triggerAttackRelease(note, duration);
+      console.log(`🎹 Played test note on track ${trackId}`);
+    }
+  };
+
+  // Route MIDI notes to specific track
+  const playNoteOnTrack = (trackId: string, midiNote: number, duration: number, velocity: number = 100) => {
+    const channel = audioChannelsRef.current.get(trackId);
+    if (channel && !channel.channel.mute) {
+      const note = Tone.Frequency(midiNote, 'midi').toNote();
+      const velocityNormalized = velocity / 127;
+      channel.synth.triggerAttackRelease(note, duration, undefined, velocityNormalized);
+    }
+  };
+
+  // Schedule MIDI notes on a track
+  const scheduleNotesOnTrack = (trackId: string, notes: Array<{pitch: number, start: number, duration: number, velocity: number}>) => {
+    const channel = audioChannelsRef.current.get(trackId);
+    if (!channel) return;
+
+    notes.forEach(note => {
+      const toneNote = Tone.Frequency(note.pitch, 'midi').toNote();
+      const velocityNormalized = note.velocity / 127;
+      const startTime = `${note.start}:0:0`;
+      const noteDuration = `${note.duration}:0:0`;
+
+      Tone.Transport.schedule((time) => {
+        if (!channel.channel.mute) {
+          channel.synth.triggerAttackRelease(toneNote, noteDuration, time, velocityNormalized);
+        }
+      }, startTime);
+    });
+
+    console.log(`🎼 Scheduled ${notes.length} notes on track ${trackId}`);
+  };
+
+  // Expose mixer functions to parent components via ref or context
+  useEffect(() => {
+    // Store mixer functions in window for global access (temporary solution)
+    if (typeof window !== 'undefined') {
+      (window as any).mixerAPI = {
+        playNoteOnTrack,
+        scheduleNotesOnTrack,
+        playTestNote,
+        getTracks: () => tracks,
+        getAudioChannel: (trackId: string) => audioChannelsRef.current.get(trackId),
+      };
+    }
+  }, [tracks]);
 
   const selectedTrackData = tracks.find((t) => t.id === selectedTrack);
 
@@ -184,7 +417,7 @@ export default function Mixer() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Track List */}
-        <div className="w-80 border-r border-white/10 overflow-auto">
+        <div className="w-80 border-r border-white/10 overflow-y-auto overflow-x-hidden custom-scrollbar-thin">
           <div className="p-4 space-y-2">
             {tracks.map((track) => (
               <div
@@ -244,6 +477,16 @@ export default function Mixer() {
                   >
                     S
                   </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      playTestNote(track.id);
+                    }}
+                    className="px-3 py-1 rounded text-xs font-medium transition-all bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30"
+                    title="Test sound"
+                  >
+                    🎵
+                  </button>
                   <div className="flex-1 text-right">
                     <span className="text-xs text-gray-500 font-mono">
                       {track.volume > 0 ? '+' : ''}{track.volume.toFixed(1)} dB
@@ -256,7 +499,7 @@ export default function Mixer() {
         </div>
 
         {/* Main Mixer Area */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 custom-scrollbar">
           {/* Waveform Visualizer */}
           <div className="mb-6">
             <div className="bg-black/30 border border-white/10 rounded-2xl p-6 overflow-hidden">

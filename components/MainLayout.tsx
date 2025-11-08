@@ -5,6 +5,7 @@ import PianoRollGrid from './PianoRollGrid';
 import ShaderBackground from './shader-background';
 import AICopilot from './AICopilot';
 import Mixer from './Mixer';
+import LyricsEditor from './LyricsEditor';
 import { useAudioEngine } from '@/src/hooks/useAudioEngine';
 import { useStore } from '@/src/store';
 
@@ -166,11 +167,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
             )}
 
             {activePanel === 'lyrics' && (
-              <div className="flex h-full items-center justify-center">
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-12 text-center">
-                  <h2 className="text-3xl font-bold text-white/90">Lyrics Editor</h2>
-                  <p className="mt-3 text-gray-400">Lyrics editor will appear here</p>
-                </div>
+              <div className="h-full">
+                <LyricsEditor />
               </div>
             )}
 

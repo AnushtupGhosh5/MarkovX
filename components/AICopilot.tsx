@@ -128,7 +128,7 @@ You are a helpful AI music assistant. Provide concise, actionable advice about m
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-4 custom-scrollbar">
         {messages.map((message) => (
           <div
             key={message.id}
