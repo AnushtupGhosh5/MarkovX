@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import PianoRollGrid from './PianoRollGrid';
 import ShaderBackground from './shader-background';
+import TextToMusicPanel from './TextToMusicPanel';
 import { useAudioEngine } from '@/src/hooks/useAudioEngine';
 import { useStore } from '@/src/store';
 
-type PanelView = 'pianoRoll' | 'lyrics' | 'mixer';
+type PanelView = 'pianoRoll' | 'lyrics' | 'mixer' | 'textToMusic';
 
 interface MainLayoutProps {
   children?: React.ReactNode;
@@ -106,6 +107,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </svg>
           </button>
 
+          <button
+            onClick={() => setActivePanel('textToMusic')}
+            className={`group flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200 ${
+              activePanel === 'textToMusic'
+                ? 'bg-white/10 text-white'
+                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+            }`}
+            title="Text to Music"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+          </button>
+
           <div className="flex-1" />
 
           <button
@@ -137,6 +152,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     Compose, arrange, and produce your next masterpiece with intelligent assistance
                   </p>
                   <div className="flex items-center justify-center gap-4 pt-8">
+                    <button
+                      onClick={() => setActivePanel('textToMusic')}
+                      className="px-6 py-3 bg-white text-black hover:bg-gray-100 rounded-xl font-medium transition-all duration-200"
+                    >
+                      Generate Music
+                    </button>
                     <button
                       onClick={() => setActivePanel('pianoRoll')}
                       className="px-6 py-3 bg-white/10 hover:bg-white/15 text-white rounded-xl border border-white/10 transition-all duration-200"
@@ -195,6 +216,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   </div>
                   
                   <p className="text-gray-400 text-center">Mixer controls will appear here</p>
+                </div>
+              </div>
+            )}
+
+            {activePanel === 'textToMusic' && (
+              <div className="h-full p-8">
+                <div className="max-w-4xl mx-auto">
+                  <TextToMusicPanel />
                 </div>
               </div>
             )}

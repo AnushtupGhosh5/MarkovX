@@ -38,3 +38,4 @@ next-env.d.ts
 frontend
 *.pyc
 venv
+venv310
