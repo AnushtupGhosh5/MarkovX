@@ -18,6 +18,7 @@ interface Track {
 
 interface AudioChannel {
   synth: Tone.PolySynth;
+  player?: Tone.Player;
   volume: Tone.Volume;
   panner: Tone.Panner;
   channel: Tone.Channel;
@@ -26,38 +27,7 @@ interface AudioChannel {
 export default function Mixer() {
   // Audio channels for each track
   const audioChannelsRef = useRef<Map<string, AudioChannel>>(new Map());
-  const [tracks, setTracks] = useState<Track[]>([
-    {
-      id: '1',
-      name: 'Piano',
-      volume: -10,
-      pan: 0,
-      muted: false,
-      solo: false,
-      color: '#3b82f6',
-      type: 'midi',
-    },
-    {
-      id: '2',
-      name: 'Bass',
-      volume: -12,
-      pan: -0.2,
-      muted: false,
-      solo: false,
-      color: '#8b5cf6',
-      type: 'midi',
-    },
-    {
-      id: '3',
-      name: 'Drums',
-      volume: -8,
-      pan: 0.1,
-      muted: false,
-      solo: false,
-      color: '#ec4899',
-      type: 'midi',
-    },
-  ]);
+  const [tracks, setTracks] = useState<Track[]>([]);
 
   const [masterVolume, setMasterVolume] = useState(-6);
   const [masterMuted, setMasterMuted] = useState(false);
@@ -70,6 +40,7 @@ export default function Mixer() {
   const [isInitialized, setIsInitialized] = useState(false);
 
   const { session } = useStore((state) => ({ session: state.session }));
+  const [isPlaying, setIsPlaying] = useState(false);
 
   // Initialize audio engine
   useEffect(() => {
@@ -121,7 +92,7 @@ export default function Mixer() {
   const createAudioChannel = (track: Track): AudioChannel => {
     console.log(`🎵 Creating audio channel for ${track.name}`);
 
-    // Create synth
+    // Create synth for MIDI
     const synth = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'triangle' },
       envelope: {
@@ -131,6 +102,26 @@ export default function Mixer() {
         release: 0.5,
       },
     });
+
+    // Create player for audio files
+    let player: Tone.Player | undefined;
+    if (track.type === 'audio' && track.audioUrl) {
+      try {
+        player = new Tone.Player({
+          url: track.audioUrl,
+          loop: true,
+          autostart: false,
+          onload: () => {
+            console.log(`✅ Audio loaded for ${track.name}`);
+          },
+          onerror: (error) => {
+            console.error(`❌ Failed to load audio for ${track.name}:`, error);
+          }
+        }).sync().start(0);
+      } catch (error) {
+        console.error(`❌ Error creating player for ${track.name}:`, error);
+      }
+    }
 
     // Create volume control
     const volume = new Tone.Volume(track.volume);
@@ -145,8 +136,11 @@ export default function Mixer() {
       mute: track.muted,
     });
 
-    // Connect: synth -> volume -> panner -> channel -> master
+    // Connect: synth/player -> volume -> panner -> channel -> master
     synth.connect(volume);
+    if (player) {
+      player.connect(volume);
+    }
     volume.connect(panner);
     panner.connect(channel);
     
@@ -156,6 +150,7 @@ export default function Mixer() {
 
     const audioChannel: AudioChannel = {
       synth,
+      player,
       volume,
       panner,
       channel,
@@ -278,11 +273,113 @@ export default function Mixer() {
     }
   };
 
+  // Load audio file into a track
+  const loadAudioFile = async (file: File) => {
+    try {
+      const url = URL.createObjectURL(file);
+      console.log(`📁 Loading audio file: ${file.name}`);
+      
+      const newTrack: Track = {
+        id: Date.now().toString(),
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        volume: -10,
+        pan: 0,
+        muted: false,
+        solo: false,
+        color: `#${Math.floor(Math.random() * 16777215).toString(16)}`,
+        type: 'audio',
+        audioUrl: url,
+      };
+      
+      setTracks((prev) => [...prev, newTrack]);
+      
+      if (isInitialized) {
+        setTimeout(() => {
+          createAudioChannel(newTrack);
+          console.log(`✅ Track created: ${newTrack.name}`);
+        }, 100);
+      }
+    } catch (error) {
+      console.error('❌ Error loading audio file:', error);
+    }
+  };
+
+  // Load generated audio from session
+  useEffect(() => {
+    if (session.generatedAudio.length > 0 && isInitialized) {
+      // Only add new tracks that don't exist yet
+      const existingIds = new Set(tracks.map(t => t.id));
+      const newAudios = session.generatedAudio.filter(audio => !existingIds.has(audio.id));
+      
+      if (newAudios.length > 0) {
+        const newTracks = newAudios.map((audio, index) => ({
+          id: audio.id,
+          name: audio.prompt.slice(0, 30) || `Generated ${tracks.length + index + 1}`,
+          volume: -10,
+          pan: 0,
+          muted: false,
+          solo: false,
+          color: ['#3b82f6', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b'][(tracks.length + index) % 5],
+          type: 'audio' as const,
+          audioUrl: audio.url,
+        }));
+        
+        setTracks((prev) => [...prev, ...newTracks]);
+        
+        // Create audio channels for new tracks
+        setTimeout(() => {
+          newTracks.forEach(track => {
+            if (!audioChannelsRef.current.has(track.id)) {
+              createAudioChannel(track);
+            }
+          });
+        }, 100);
+      }
+    }
+  }, [session.generatedAudio, isInitialized]);
+
+  // Play/pause all tracks
+  const togglePlayback = async () => {
+    try {
+      await Tone.start();
+      console.log('🎵 Audio context started');
+      
+      if (isPlaying) {
+        Tone.Transport.pause();
+        setIsPlaying(false);
+        console.log('⏸ Playback paused');
+      } else {
+        // Ensure all players are ready
+        audioChannelsRef.current.forEach((channel, trackId) => {
+          if (channel.player && channel.player.loaded) {
+            console.log(`✅ Player ready for track ${trackId}`);
+          }
+        });
+        
+        Tone.Transport.start();
+        setIsPlaying(true);
+        setIsAnalyzing(true);
+        console.log('▶ Playback started');
+      }
+    } catch (error) {
+      console.error('❌ Playback error:', error);
+    }
+  };
+
+  // Stop all tracks
+  const stopPlayback = () => {
+    Tone.Transport.stop();
+    setIsPlaying(false);
+  };
+
   const deleteTrack = (trackId: string) => {
     // Dispose audio channel
     const channel = audioChannelsRef.current.get(trackId);
     if (channel) {
       channel.synth.dispose();
+      if (channel.player) {
+        channel.player.dispose();
+      }
       channel.volume.dispose();
       channel.panner.dispose();
       channel.channel.dispose();
@@ -327,20 +424,48 @@ export default function Mixer() {
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={togglePlayback}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                isPlaying
+                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  : 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
+              }`}
+            >
+              {isPlaying ? '⏸ Pause' : '▶ Play'}
+            </button>
+            <button
+              onClick={stopPlayback}
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium border border-white/10 transition-all"
+            >
+              ⏹ Stop
+            </button>
+            <button
               onClick={() => setIsAnalyzing(!isAnalyzing)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 isAnalyzing
-                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                   : 'bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10'
               }`}
             >
-              {isAnalyzing ? '● Live' : 'Start Analysis'}
+              {isAnalyzing ? '● Analyzing' : 'Analyze'}
             </button>
+            <label className="px-4 py-2 bg-white/10 hover:bg-white/15 text-white rounded-lg text-sm font-medium border border-white/10 transition-all cursor-pointer">
+              📁 Load Audio
+              <input
+                type="file"
+                accept="audio/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) loadAudioFile(file);
+                }}
+                className="hidden"
+              />
+            </label>
             <button
               onClick={addTrack}
               className="px-4 py-2 bg-white/10 hover:bg-white/15 text-white rounded-lg text-sm font-medium border border-white/10 transition-all"
             >
-              + Add Track
+              + MIDI Track
             </button>
           </div>
         </div>
