@@ -1072,9 +1072,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 For questions, suggestions, or issues:
 
-- **GitHub Issues**: [Create an issue](https://github.com/yourusername/musepilot/issues)
-- **Email**: your.email@example.com
-- **Twitter**: @yourusername
+- **GitHub Issues**: [Create an issue](https://github.com/AnushtupGhosh5/MarkovX/issues)
+- **Email**: anushtupghosh5@gmail.com
 
 ---
 
