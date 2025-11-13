@@ -51,6 +51,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<HummingTo
     const data = await response.json();
     console.log(`[HummingToMusic] Generated ${data.num_tracks} tracks`);
 
+    // Convert backend URLs to full URLs
+    if (data.audio_url) {
+      data.audio_url = `${serverUrl}${data.audio_url}`;
+    }
+    if (data.midi_url) {
+      data.midi_url = `${serverUrl}${data.midi_url}`;
+    }
+
     return NextResponse.json(data);
 
   } catch (error: any) {

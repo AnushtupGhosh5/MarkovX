@@ -1,0 +1,14 @@
+# Core dependencies for humming-to-MIDI
+fastapi
+uvicorn
+numpy
+librosa
+crepe
+pretty-midi
+soundfile
+
+# Optional: For better audio synthesis (requires FluidSynth binary installed)
+# pyfluidsynth
+
+# Note: pretty-midi has built-in synthesis that works without FluidSynth
+# For better quality, install FluidSynth separately

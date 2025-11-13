@@ -49,8 +49,8 @@ async def root():
 @app.post("/extract-melody")
 async def extract_melody(
     audio_file: UploadFile = File(...),
-    confidence_threshold: float = Form(0.5),
-    min_note_duration: float = Form(0.1),
+    confidence_threshold: float = Form(0.3),
+    min_note_duration: float = Form(0.05),
     smooth_window: int = Form(5)
 ):
     """
@@ -175,7 +175,7 @@ async def humming_to_music(
     add_accompaniment: bool = Form(True),
     progression_type: str = Form("pop"),
     bass_pattern: str = Form("root"),
-    confidence_threshold: float = Form(0.5)
+    confidence_threshold: float = Form(0.3)
 ):
     """
     Complete pipeline: humming audio -> melody + accompaniment
@@ -188,11 +188,24 @@ async def humming_to_music(
         tmp_audio_path = tmp_audio.name
     
     try:
+        print(f"[HummingToMusic] Processing audio file: {audio_file.filename}")
+        
         # Extract melody
         midi, notes_data = audio_to_midi(
             tmp_audio_path,
             confidence_threshold=confidence_threshold
         )
+        
+        print(f"[HummingToMusic] Extracted {len(notes_data)} notes")
+        
+        if not notes_data or len(notes_data) == 0:
+            # Return a more helpful error with suggestions
+            return JSONResponse({
+                "success": False,
+                "error": "No melody detected. Tips: Hum louder, closer to the microphone, for at least 3 seconds with clear notes.",
+                "notes": [],
+                "num_notes": 0
+            }, status_code=400)
         
         # Add accompaniment if requested
         if add_accompaniment and notes_data:
@@ -205,15 +218,19 @@ async def humming_to_music(
                 add_bass=True,
                 bass_pattern=bass_pattern
             )
+            print(f"[HummingToMusic] Added accompaniment, total tracks: {len(midi.instruments)}")
         
         # Save MIDI
         midi_filename = f"music_{os.urandom(8).hex()}.mid"
         midi_path = OUTPUT_DIR / midi_filename
         midi.write(str(midi_path))
+        print(f"[HummingToMusic] MIDI saved: {midi_filename}")
         
         # Synthesize to audio
         audio_filename = f"music_{os.urandom(8).hex()}.wav"
         audio_path = OUTPUT_DIR / audio_filename
+        
+        print(f"[HummingToMusic] Synthesizing audio...")
         audio_result = synthesize_midi_to_audio(midi, str(audio_path))
         
         response_data = {
@@ -226,10 +243,18 @@ async def humming_to_music(
         
         if audio_result:
             response_data["audio_url"] = f"/download/{audio_filename}"
+            print(f"[HummingToMusic] ✓ Complete! Audio: {audio_filename}")
+        else:
+            print(f"[HummingToMusic] ⚠ Audio synthesis failed, MIDI only")
         
         return JSONResponse(response_data)
     
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"[HummingToMusic] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
     
     finally:

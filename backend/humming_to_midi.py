@@ -15,7 +15,7 @@ def extract_pitch_from_audio(
     audio_path: str,
     sr: int = 16000,
     hop_length: int = 160,
-    confidence_threshold: float = 0.5
+    confidence_threshold: float = 0.3
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Extract pitch contour from audio using CREPE
@@ -156,8 +156,8 @@ def create_midi_from_notes(
 def audio_to_midi(
     audio_path: str,
     output_path: Optional[str] = None,
-    confidence_threshold: float = 0.5,
-    min_note_duration: float = 0.1,
+    confidence_threshold: float = 0.3,
+    min_note_duration: float = 0.05,
     smooth_window: int = 5
 ) -> Tuple[pretty_midi.PrettyMIDI, List[dict]]:
     """

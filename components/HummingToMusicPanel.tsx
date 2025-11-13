@@ -175,6 +175,7 @@ export default function HummingToMusicPanel() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
         <h2 className="text-2xl font-bold mb-2">Humming to Music</h2>
         <p className="text-gray-600">

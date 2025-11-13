@@ -195,21 +195,39 @@ def synthesize_midi_to_audio(
     sample_rate: int = 44100
 ) -> str:
     """
-    Synthesize MIDI to audio using FluidSynth
+    Synthesize MIDI to audio using FluidSynth or fallback to basic synthesis
     """
     try:
-        # Synthesize using pretty_midi's built-in synthesizer
+        # Try FluidSynth first
         audio = midi.fluidsynth(fs=sample_rate)
         
         # Save to file
         import soundfile as sf
         sf.write(output_path, audio, sample_rate)
         
+        print(f"✓ Audio synthesized with FluidSynth: {output_path}")
         return output_path
     except Exception as e:
-        print(f"Warning: Could not synthesize audio: {e}")
-        print("Make sure FluidSynth is installed: pip install pyfluidsynth")
-        return None
+        print(f"FluidSynth not available ({e}), using basic synthesis...")
+        
+        try:
+            # Fallback: Use pretty_midi's synthesize method
+            audio = midi.synthesize(fs=sample_rate)
+            
+            # Normalize audio
+            if len(audio) > 0:
+                audio = audio / np.max(np.abs(audio) + 1e-10)
+            
+            # Save to file
+            import soundfile as sf
+            sf.write(output_path, audio, sample_rate)
+            
+            print(f"✓ Audio synthesized with basic synthesis: {output_path}")
+            return output_path
+        except Exception as e2:
+            print(f"Error: Could not synthesize audio: {e2}")
+            print("Audio generation failed. MIDI file is still available.")
+            return None
 
 
 if __name__ == "__main__":

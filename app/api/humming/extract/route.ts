@@ -55,6 +55,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<ExtractMe
     const data = await response.json();
     console.log(`[ExtractMelody] Extracted ${data.num_notes} notes`);
 
+    // Convert backend URLs to full URLs
+    if (data.midi_url) {
+      data.midi_url = `${serverUrl}${data.midi_url}`;
+    }
+
     return NextResponse.json(data);
 
   } catch (error: any) {
